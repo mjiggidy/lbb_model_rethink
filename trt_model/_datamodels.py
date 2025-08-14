@@ -33,6 +33,8 @@ class TimelineInfo:
 	bin_lock:avbutils.LockInfo|None
 	"""Bin lock info if available"""
 
+
+
 @dataclasses.dataclass
 class TRTMarkerPresetInfo:
 	"""Represents a marker matching preset thing"""
@@ -85,10 +87,6 @@ class TRTDataModel:
 			self._marker_ffoa:TRTMarkerPresetInfo|None = None
 			self._marker_lfoa:TRTMarkerPresetInfo|None = None
 
-			# Calculated from user settings
-			self._active_ffoa_offset = self._default_ffoa
-			self._active_lfoa_offset = self._default_lfoa
-
 			self._timecode_trimmed = self._timeline_info.timeline_tc_range
 
 		def timelineName(self) -> str:
@@ -103,7 +101,7 @@ class TRTDataModel:
 			"""Bin lock info if available"""
 			return self._timeline_info.bin_lock
 		
-		def timelineColor(self) -> avbutils.ClipColor:
+		def timelineColor(self) -> avbutils.ClipColor|None:
 			"""Timeline clip color"""
 			return self._timeline_info.timeline_color
 		
@@ -133,95 +131,66 @@ class TRTDataModel:
 		
 		def ffoaOffset(self) -> Timecode:
 			"""Duration from head to FFOA"""
-			return self._active_ffoa_offset
+			return self._timecode_trimmed.start - self._timeline_info.timeline_tc_range.start
 		
 		def lfoaOffset(self) -> Timecode:
 			"""Duration from LFOA to tail"""
-			return self._active_lfoa_offset
+			return self._timeline_info.timeline_tc_range.end - self._timecode_trimmed.end
 		
 		# Setters & Dynamic stuff
-		def setGlobalFFOA(self, ffoa:Timecode):
-			"""Default FFOA offset used "globally" for each timeline unless a marker match overrides this"""
+		def setGlobalFFOA(self, ffoa_offset:Timecode):
+			"""Set the relative FFOA offset used "globally" for each timeline unless a marker match overrides this"""
 			
-			if ffoa.rate != self._timecode_trimmed.rate:
+			if ffoa_offset.rate != self._timecode_trimmed.rate:
 				raise ValueError("FFOA duration rate must match the timeline's timecode rate")
 			
-			self._default_ffoa = ffoa
-			self._updateFFOAOffset()
+			self._default_ffoa = ffoa_offset
+			self._updateTimelineTimecodeTrimmed()
 
-		def setGlobalLFOA(self, lfoa:Timecode):
-			"""Default LFOA offset used "globally" for each timeline unless a marker match overrides this"""
+		def setGlobalLFOA(self, lfoa_offset:Timecode):
+			"""Set the relative LFOA offset used "globally" for each timeline unless a marker match overrides this"""
 			
-			if lfoa.rate != self._timecode_trimmed.rate:
+			if lfoa_offset.rate != self._timecode_trimmed.rate:
 				raise ValueError("LFOA duration rate must match the timeline's timecode rate")
 			
-			self._default_lfoa = lfoa
-			self._updateLFOAOffset()
+			self._default_lfoa = lfoa_offset
+			self._updateTimelineTimecodeTrimmed()
 
-		def findMarkerFFOAFromPreset(self, marker_preset:TRTMarkerPresetInfo):
+		def setMarkerFFOAFromPreset(self, marker_preset:TRTMarkerPresetInfo):
 			"""See if we can match us some of them marker for FFOA"""
 
-			if marker_preset is None:
-				self._marker_ffoa = None
+			self._marker_ffoa = self._findMarkerFromPreset(marker_preset, from_end=False) if marker_preset else None
+			self._updateTimelineTimecodeTrimmed()
 
-			else:
-				self._marker_ffoa = self._findMarkerFromPreset(
-					marker_preset,
-					sorted(self._timeline_info.markers, key=lambda m: m.frm_offset)
-				)
-
-			self._updateFFOAOffset()
-
-			return self.markerFFOA()
-
-		def findMarkerLFOAFromPreset(self, marker_preset:TRTMarkerPresetInfo):
+		def setMarkerLFOAFromPreset(self, marker_preset:TRTMarkerPresetInfo):
 			"""See if we can match us some of them marker for LFOA"""
 
-			if marker_preset is None:
-				self._marker_lfoa = None
+			self._marker_lfoa = self._findMarkerFromPreset(marker_preset, from_end=True) if marker_preset else None
+			self._updateTimelineTimecodeTrimmed()
 
-			else:
-				self._marker_lfoa = self._findMarkerFromPreset(
-					marker_preset,
-					sorted(self._timeline_info.markers, key=lambda m: m.frm_offset, reverse=True)
-				)
+		def _updateTimelineTimecodeTrimmed(self):
+			"""Update trimmed timecode extents using active ffoa/lfoa offsets"""
 
-			self._updateLFOAOffset()
+			# FFOA offset must be less than the total duration of the sequence
+			suggested_ffoa_offset = self._marker_ffoa.frm_offset if self._marker_ffoa else self._default_ffoa.frame_number
+			resolved_ffoa_offset = min(self._timeline_info.timeline_tc_range.duration, suggested_ffoa_offset)
 
-			return self.markerLFOA()
-		
-		# Helpers
-		def _updateFFOAOffset(self):
-			"""Set the frame offset to the FFOA"""
-			# Call this after any potential changes to FFOA criteria
+			# Offset must be less than total duration minus FFOA
+			suggested_lfoa_offset = self._marker_lfoa.frm_offset if self._marker_lfoa else self._default_lfoa.frame_number
+			resolved_lfoa_offset   = min(self._timeline_info.timeline_tc_range.duration - suggested_ffoa_offset, suggested_lfoa_offset)
 
-			frame_offset = self.markerFFOA().frm_offset if self.markerFFOA() else self._default_ffoa.frame_number
-
-			self._active_ffoa_offset = Timecode(frame_offset, rate=self._timecode_trimmed.rate)
+			adjusted_start_timecode:Timecode = self._timeline_info.timeline_tc_range.start + resolved_ffoa_offset
+			adjusted_end_timecode:Timecode   = self._timeline_info.timeline_tc_range.end   - resolved_lfoa_offset
 
 			self._timecode_trimmed = TimecodeRange(
-				start = self.timelineTimecodeExtents().start + frame_offset,
-				end   = max(self._timecode_trimmed.end,self.timelineTimecodeExtents().start + frame_offset)
+				start = adjusted_start_timecode,
+				end   = adjusted_end_timecode
 			)
 
-		def _updateLFOAOffset(self):
-			"""Set the frame offset to the FFOA"""
-			# Call this after any potential changes to LFOA criteria
-
-			frame_offset = (self.timelineTimecodeExtents().duration - self.markerLFOA().frm_offset - 1) if self.markerLFOA() else self._default_lfoa.frame_number
-
-			self._active_lfoa_offset = Timecode(frame_offset, rate=self._timecode_trimmed.rate)
-
-			self._timecode_trimmed = TimecodeRange(
-				start = self._timecode_trimmed.start,
-				end   = max(self.timelineTimecodeExtents().end - frame_offset, self._timecode_trimmed.start)
-			)
-
-		@classmethod
-		def _findMarkerFromPreset(self, marker_preset:TRTMarkerPresetInfo, marker_list:list[avbutils.MarkerInfo]):
+		def _findMarkerFromPreset(self, marker_preset:TRTMarkerPresetInfo, from_end:bool=False):
 			"""Match a marker to the given preset criteria"""
 
-			for marker_info in marker_list:
+			for marker_info in sorted(self._timeline_info.markers, key=lambda m: m.frm_offset, reverse=from_end):
 				if marker_preset.match(marker_info):
 					return marker_info
 			
@@ -231,6 +200,5 @@ class TRTDataModel:
 
 		self._marker_presets:list[TRTMarkerPresetInfo] = []
 		self._timelines:list["CalculatedTimelineInfo"] = []
-	
 
 
