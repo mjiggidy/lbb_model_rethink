@@ -18,13 +18,14 @@ class TRTAbstractViewHeaderItem:
 		self._item_factory = item_factory
 
 		self._data_roles = {}
+		self._prepare_data()
 	
 	def _prepare_data(self):
 		"""Precalculate Header Data"""
 
 		self._data_roles.update({
-			 QtCore.Qt.ItemDataRole.DisplayRole: str(self._display_name),
-			 QtCore.Qt.ItemDataRole.UserRole:    str(self._item_factory),
+			QtCore.Qt.ItemDataRole.DisplayRole: str(self._display_name),
+			QtCore.Qt.ItemDataRole.UserRole:    str(self._item_factory),
 		 })
 	
 	def data(self, role:QtCore.Qt.ItemDataRole) -> typing.Any:
@@ -47,7 +48,7 @@ class TRTAbstractViewItem:
 
 		self._data = raw_data
 		self._icon = icon
-		self._tooltip = tooltip
+		self._tooltip = tooltip 
 
 		self._data_roles = {}
 		self._prepare_data()
@@ -56,7 +57,7 @@ class TRTAbstractViewItem:
 		"""Precalculate them datas for all them roles"""
 		self._data_roles.update({
 			QtCore.Qt.ItemDataRole.DisplayRole:          self.to_string(self._data),
-			QtCore.Qt.ItemDataRole.ToolTipRole:          self._tooltip,
+			QtCore.Qt.ItemDataRole.ToolTipRole:          self._tooltip if self._tooltip is not None else repr(self._data),
 			QtCore.Qt.ItemDataRole.DecorationRole:       self._icon,
 			QtCore.Qt.ItemDataRole.InitialSortOrderRole: avbutils.human_sort(str(self._data)),
 			QtCore.Qt.ItemDataRole.UserRole:             self._data,
