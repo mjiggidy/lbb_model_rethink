@@ -1,6 +1,6 @@
 from timecode import TimecodeRange, Timecode
 from datetime import datetime
-from trt_model import TRTTimelineInfo, TRTTrimmedTimelineInfo, TRTMarkerPresetInfo
+from trt_model.datamodels import TRTTimelineInfo, TRTTrimmedTimelineInfo, TRTMarkerPresetInfo
 
 class Controller:
 
