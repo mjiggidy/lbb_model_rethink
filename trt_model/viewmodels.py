@@ -2,7 +2,7 @@
 View Models
 """
 import typing
-from viewitems import TRTAbstractViewItem, TRTAbstractViewHeaderItem
+from .viewitems import TRTAbstractViewItem, TRTAbstractViewHeaderItem
 from PySide6 import QtCore
 
 class TRTTimelineViewModel(QtCore.QAbstractItemModel):
@@ -17,6 +17,9 @@ class TRTTimelineViewModel(QtCore.QAbstractItemModel):
 
 		self._headers:list[TRTAbstractViewHeaderItem] = []
 		"""List of view headers"""
+
+	def parent(self, /, child:QtCore.QModelIndex) -> QtCore.QModelIndex:
+		return QtCore.QModelIndex()
 	
 	def rowCount(self, /, parent:QtCore.QModelIndex) -> int:
 		if parent.isValid():
@@ -49,14 +52,16 @@ class TRTTimelineViewModel(QtCore.QAbstractItemModel):
 		if orientation == QtCore.Qt.Orientation.Horizontal:
 			return self._headers[section].data(role)
 	
-	def insertHeader(self, header:TRTAbstractViewHeaderItem) -> bool:
+	def addHeader(self, header:TRTAbstractViewHeaderItem) -> bool:
 		
 		self.beginInsertColumns(QtCore.QModelIndex(), 0, 0)
 		self._headers.insert(0, header)
 		self.endInsertColumns()
+		return True
 
-	def insertTimeline(self, timeline:dict[str,TRTAbstractViewItem]) -> bool:
+	def addTimeline(self, timeline:dict[str,TRTAbstractViewItem]) -> bool:
 
 		self.beginInsertRows(QtCore.QModelIndex(), 0, 0)
 		self._timelines.insert(0, timeline)
 		self.endInsertRows()
+		return True
