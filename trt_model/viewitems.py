@@ -227,7 +227,7 @@ class TRTClipColorViewItem(TRTAbstractViewItem):
 	def __init__(self, raw_data:avbutils.ClipColor|QtGui.QRgba64, *args, **kwargs):
 
 		if isinstance(raw_data, avbutils.ClipColor):
-			raw_data = QtGui.QColor.fromRgba64(*raw_data, raw_data.max_16b())
+			raw_data = QtGui.QColor.fromRgba64(*raw_data.as_rgb16())
 		elif isinstance(raw_data, QtGui.QRgba64):
 			raw_data = QtGui.QColor.fromRgba64(raw_data)
 		elif not isinstance(raw_data, QtGui.QColor):
