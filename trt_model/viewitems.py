@@ -10,12 +10,14 @@ from PySide6 import QtCore, QtGui, QtWidgets
 class TRTAbstractViewHeaderItem:
 	"""An abstract header item for TRT views"""
 
-	def __init__(self, field_name:str, display_name:str, item_factory:typing.Type["TRTAbstractViewItem"]):
+	def __init__(self, field_name:str, display_name:str, item_factory:typing.Type["TRTAbstractViewItem"], delegate:QtWidgets.QStyledItemDelegate|None=None):
 
 		self._field_name = field_name
 		self._display_name = display_name
 
 		self._item_factory = item_factory
+
+		self._delgate = delegate
 
 		self._data_roles = {}
 		self._prepare_data()
@@ -39,6 +41,9 @@ class TRTAbstractViewHeaderItem:
 	
 	def field_name(self) -> str:
 		return self._field_name
+	
+	def delegate(self) -> QtWidgets.QStyledItemDelegate:
+		return self._delgate
 
 class TRTAbstractViewItem:
 	"""An abstract item for TRT views"""
