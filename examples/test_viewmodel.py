@@ -1,8 +1,33 @@
 import sys
 from timecode import Timecode
-from avbutils import LockInfo
+import avbutils
+import avb
+
 from trt_model import viewmodels, viewitems
 from PySide6 import QtWidgets, QtCore
+
+def get_timelines_from_bin(bin_path:str):
+
+	timeline_info_list = []
+
+	with avb.open(bin_path) as bin_handle:
+
+		for timeline in avbutils.get_timelines_from_bin(bin_handle.content):
+
+			timeline_info_list.append({
+				"clip_color": viewitems.TRTClipColorViewItem(avbutils.composition_clip_color(timeline)),
+				"timeline_name": viewitems.TRTStringViewItem(timeline.name),
+				"start_timecode": viewitems.TRTTimecodeViewItem(avbutils.get_timecode_range_for_composition(timeline).start),
+				"duration_frames": viewitems.TRTNumericViewItem(avbutils.get_timecode_range_for_composition(timeline).duration),
+				"duration_ff": viewitems.TRTFeetFramesViewItem(int(avbutils.get_timecode_range_for_composition(timeline).duration)),
+				"duration_timecode": viewitems.TRTDurationViewItem(avbutils.get_timecode_range_for_composition(timeline).duration),
+				"bin_path": viewitems.TRTPathViewItem(bin_path),
+				"bin_lock": viewitems.TRTBinLockViewItem(avbutils.LockInfo("Tee hee hee!"))
+			})
+	
+	return timeline_info_list
+
+
 
 def main():
 
@@ -20,36 +45,25 @@ def main():
 	tree_timelines.setModel(QtCore.QSortFilterProxyModel())
 	tree_timelines.model().setSourceModel(viewmodel_timelines)
 
-	viewmodel_timelines.addHeader(viewitems.TRTAbstractViewHeaderItem("timeline_name", "Name", viewitems.TRTStringViewItem))
-	viewmodel_timelines.addHeader(viewitems.TRTAbstractViewHeaderItem("start_timecode", "Start TC", viewitems.TRTTimecodeViewItem))
-	viewmodel_timelines.addHeader(viewitems.TRTAbstractViewHeaderItem("duration_ff", "Duration (F+F)", viewitems.TRTFeetFramesViewItem))
-	viewmodel_timelines.addHeader(viewitems.TRTAbstractViewHeaderItem("duration_frames", "Duration (Frames)", viewitems.TRTNumericViewItem))
-	viewmodel_timelines.addHeader(viewitems.TRTAbstractViewHeaderItem("duration_timecode", "Duration (TC)", viewitems.TRTDurationViewItem))
-	viewmodel_timelines.addHeader(viewitems.TRTAbstractViewHeaderItem("bin_path", "Bin Path", viewitems.TRTPathViewItem))
-	viewmodel_timelines.addHeader(viewitems.TRTAbstractViewHeaderItem("bin_lock", "Bin Lock", viewitems.TRTBinLockViewItem))
+	headers = [
+		viewitems.TRTAbstractViewHeaderItem("clip_color", "Clip Color", viewitems.TRTStringViewItem),
+		viewitems.TRTAbstractViewHeaderItem("timeline_name", "Name", viewitems.TRTStringViewItem),
+		viewitems.TRTAbstractViewHeaderItem("start_timecode", "Start TC", viewitems.TRTTimecodeViewItem),
+		viewitems.TRTAbstractViewHeaderItem("duration_ff", "Duration (F+F)", viewitems.TRTFeetFramesViewItem),
+		viewitems.TRTAbstractViewHeaderItem("duration_frames", "Duration (Frames)", viewitems.TRTNumericViewItem),
+		viewitems.TRTAbstractViewHeaderItem("duration_timecode", "Duration (TC)", viewitems.TRTDurationViewItem),
+		viewitems.TRTAbstractViewHeaderItem("bin_path", "Bin Path", viewitems.TRTPathViewItem),
+		viewitems.TRTAbstractViewHeaderItem("bin_lock", "Bin Lock", viewitems.TRTBinLockViewItem),
+	]
 
-	viewmodel_timelines.addTimeline({
-		"timeline_name": viewitems.TRTStringViewItem("Timeline 1"),
-		"start_timecode": viewitems.TRTTimecodeViewItem(Timecode("01:00:00:00")),
-		"duration_frames": viewitems.TRTNumericViewItem(2),
-		"duration_ff": viewitems.TRTFeetFramesViewItem(800),
-		"duration_timecode": viewitems.TRTDurationViewItem(Timecode(800)),
-		"bin_path": viewitems.TRTPathViewItem("/Users/mjordan/Desktop/GLMP_250719_LensTest_01.mxf"),
-		"bin_lock": viewitems.TRTBinLockViewItem(LockInfo("Tee hee hee!"))
-	})
+	for head in headers[::-1]:
+		viewmodel_timelines.addHeader(head)
 
-	viewmodel_timelines.addTimeline({
-		"timeline_name": viewitems.TRTStringViewItem("Timeline 2"),
-		"start_timecode": viewitems.TRTTimecodeViewItem(Timecode("02:00:00:00")),
-		"duration_frames": viewitems.TRTNumericViewItem(4),
-	})
 
-	viewmodel_timelines.addTimeline({
-		"timeline_name": viewitems.TRTStringViewItem("Timeline 3"),
-		"start_timecode": viewitems.TRTTimecodeViewItem(Timecode("03:00:00:00")),
-		"duration_frames": viewitems.TRTNumericViewItem(8),
-		"bin_path": viewitems.TRTPathViewItem("/Users/mjordan/Desktop/GLMP_250719_LensTest_01.mxf")
-	})
+	timelines = get_timelines_from_bin(sys.argv[1])
+
+	for timeline_info in timelines:
+		viewmodel_timelines.addTimeline(timeline_info)
 
 	return app.exec()
 
