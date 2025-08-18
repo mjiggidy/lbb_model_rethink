@@ -11,7 +11,7 @@ class BinLoaderSignals(QtCore.QObject):
 
 	sig_total_rows_determiend = QtCore.Signal(int)
 	sig_row_loaded = QtCore.Signal(dict)
-	sig_header_added = QtCore.Signal(viewitems.TRTAbstractViewHeaderItem)
+	sig_header_added = QtCore.Signal(object)
 
 class BinLoader(QtCore.QRunnable):
 
