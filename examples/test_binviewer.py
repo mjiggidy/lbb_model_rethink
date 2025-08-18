@@ -1,5 +1,4 @@
 import sys, os, pathlib
-sys.path.insert(0,"/home/mjordan/dev/lbb_model_rethink/")
 from PySide6 import QtCore, QtWidgets
 from trt_model import viewmodels, viewitems
 
