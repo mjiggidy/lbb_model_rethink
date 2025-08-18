@@ -48,6 +48,12 @@ class TRTTimelineViewModel(QtCore.QAbstractItemModel):
 
 		return timeline.get(field_name).data(role)
 	
+	def clear(self):
+		self.beginResetModel()
+		self._timelines = []
+		self._headers = []
+		self.endResetModel()
+	
 	def headerData(self, section:int, orientation:QtCore.Qt.Orientation, /, role:QtCore.Qt.ItemDataRole) -> typing.Any:
 		if orientation == QtCore.Qt.Orientation.Horizontal:
 			return self._headers[section].data(role)
