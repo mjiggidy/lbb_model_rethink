@@ -82,7 +82,7 @@ class BinViewerMainWindow(QtWidgets.QMainWindow):
 		self.centralWidget().setLayout(QtWidgets.QVBoxLayout())
 
 		self._tree_viewer = QtWidgets.QTreeView()
-		self._tree_viewer.setModel(QtCore.QSortFilterProxyModel())
+		self._tree_viewer.setModel(viewmodels.TRTSortFilterProxyModel())
 		self._tree_viewer.setSortingEnabled(True)
 		self._tree_viewer.setAlternatingRowColors(True)
 		self._tree_viewer.setUniformRowHeights(True)

@@ -160,11 +160,11 @@ class TRTPathViewItem(TRTAbstractViewItem):
 class TRTDateTimeViewItem(TRTAbstractViewItem):
 	"""A datetime entry"""
 
-	def __init__(self, raw_data:datetime.datetime, format_string:str="%c"):
+	def __init__(self, raw_data:datetime.datetime, format_string:QtCore.Qt.DateFormat|str=QtCore.Qt.DateFormat.TextDate):
 		
 		self._format_string = format_string
 		
-		super().__init__(raw_data)
+		super().__init__(QtCore.QDateTime.fromMSecsSinceEpoch(int(raw_data.timestamp() * 1000)).toLocalTime())
 	
 	def setFormatString(self, format_string:str):
 		"""Set the datetime formatting string used by strftime"""
@@ -179,7 +179,7 @@ class TRTDateTimeViewItem(TRTAbstractViewItem):
 		super()._prepare_data()
 	
 		self._data_roles.update({
-			QtCore.Qt.ItemDataRole.DisplayRole: self._data.strftime(self._format_string)
+			QtCore.Qt.ItemDataRole.DisplayRole: self._data.toString(self._format_string),
 		})
 	
 	def to_json(self) -> dict:

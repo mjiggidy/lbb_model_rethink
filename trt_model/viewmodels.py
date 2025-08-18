@@ -5,6 +5,13 @@ import typing
 from .viewitems import TRTAbstractViewItem, TRTAbstractViewHeaderItem
 from PySide6 import QtCore
 
+class TRTSortFilterProxyModel(QtCore.QSortFilterProxyModel):
+
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.setSortRole(QtCore.Qt.ItemDataRole.InitialSortOrderRole)
+	
+
 class TRTTimelineViewModel(QtCore.QAbstractItemModel):
 	"""A view model for timelines"""
 
