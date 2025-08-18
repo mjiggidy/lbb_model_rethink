@@ -2,7 +2,7 @@
 View Items for View Models
 """
 
-import typing
+import typing, enum, datetime
 import avbutils
 from timecode import Timecode
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -72,6 +72,10 @@ class TRTAbstractViewItem:
 		"""Get item data for a given role.  By default, returns the raw data as a string."""
 		return self._data_roles.get(role, None)
 	
+	def setData(self, role:QtCore.Qt.ItemDataRole, data:typing.Any):
+		"""Override data for a particular role"""
+		self._data_roles[role] = data
+	
 	def itemData(self) -> dict[QtCore.Qt.ItemDataRole, typing.Any]:
 		"""Get all item data roles"""
 		return self._data_roles
@@ -87,8 +91,27 @@ class TRTAbstractViewItem:
 class TRTStringViewItem(TRTAbstractViewItem):
 	"""A standard string"""
 
-	def __init__(self, raw_data:str, *args, **kwargs):
-		super().__init__(str(raw_data), *args, **kwargs)
+	def _prepare_data(self):
+		super()._prepare_data()
+
+		self._data_roles.update({
+			QtCore.Qt.ItemDataRole.DisplayRole:          str(self._data),
+		})
+
+class TRTEnumViewItem(TRTAbstractViewItem):
+	"""Represents an Enum"""
+
+	def __init__(self, raw_data:enum.Enum, *args, **kwargs):
+		super().__init__(raw_data, *args, **kwargs)
+
+	def _prepare_data(self):
+		super()._prepare_data()
+
+		self._data_roles.update({
+			QtCore.Qt.ItemDataRole.DisplayRole:          self._data.name.replace("_", " ").title(),
+			QtCore.Qt.ItemDataRole.InitialSortOrderRole: self._data.value,
+		})
+	
 
 class TRTNumericViewItem(TRTAbstractViewItem):
 	"""A numeric value"""
@@ -137,20 +160,32 @@ class TRTPathViewItem(TRTAbstractViewItem):
 class TRTDateTimeViewItem(TRTAbstractViewItem):
 	"""A datetime entry"""
 
-	def __init__(self, raw_data:QtCore.QDateTime):
+	def __init__(self, raw_data:datetime.datetime, format_string:str="%c"):
+		
+		self._format_string = format_string
+		
 		super().__init__(raw_data)
+	
+	def setFormatString(self, format_string:str):
+		"""Set the datetime formatting string used by strftime"""
+		self._format_string = format_string
+		self._data_roles.update()
+	
+	def formatString(self) -> str:
+		"""The datetime formatting string used by strftime"""
+		return self._format_string
 
 	def _prepare_data(self):
 		super()._prepare_data()
 	
 		self._data_roles.update({
-			QtCore.Qt.ItemDataRole.DisplayRole: self._data.toLocalTime().toString("dd MMM yyyy hh:mm:ss AP")
+			QtCore.Qt.ItemDataRole.DisplayRole: self._data.strftime(self._format_string)
 		})
 	
 	def to_json(self) -> dict:
 		return {
 			"type": "datetime",
-			"timestamp": self.data(QtCore.Qt.ItemDataRole.UserRole).toSecsSinceEpoch(),
+			"timestamp": self.data(QtCore.Qt.ItemDataRole.UserRole).timestamp(),
 			"formatted": self.data(QtCore.Qt.ItemDataRole.DisplayRole)
 		}
 
