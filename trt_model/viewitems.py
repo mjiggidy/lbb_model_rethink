@@ -51,11 +51,10 @@ class TRTAbstractViewItem:
 	"""An abstract item for TRT views"""
 
 	def __init__(self, raw_data:typing.Any, icon:QtGui.QIcon|None=None, tooltip:QtWidgets.QToolTip|str|None=None):
-		#super().__init__()
 
 		self._data = raw_data
 		self._icon = icon
-		self._tooltip = tooltip 
+		self._tooltip = tooltip
 
 		self._data_roles = {}
 		self._prepare_data()
