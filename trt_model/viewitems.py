@@ -2,10 +2,12 @@
 View Items for View Models
 """
 
-import typing, enum, datetime
+import typing, enum, datetime, os
 import avbutils
 from timecode import Timecode
 from PySide6 import QtCore, QtGui, QtWidgets
+from functools import singledispatch
+
 
 class TRTAbstractViewHeaderItem:
 	"""An abstract header item for TRT views"""
@@ -320,3 +322,35 @@ class TRTBinLockViewItem(TRTAbstractViewItem):
 	def to_json(self) -> str|None:
 		return self.data(QtCore.Qt.ItemDataRole.DisplayRole) or None
 
+@singledispatch
+def get_viewitem_for_item(item:typing.Any) -> TRTAbstractViewItem:
+	"""Return the most suitable view item for a given item"""
+	return TRTStringViewItem(item)
+
+@get_viewitem_for_item.register
+def _(item:TRTAbstractViewItem):
+	return item
+
+@get_viewitem_for_item.register
+def _(item:str):
+	return TRTStringViewItem(item)
+
+@get_viewitem_for_item.register
+def _(item:int|float):
+	return TRTNumericViewItem(item)
+
+@get_viewitem_for_item.register
+def _(item:enum.Enum):
+	return TRTEnumViewItem(item)
+
+@get_viewitem_for_item.register
+def _(item:os.PathLike):
+	return TRTPathViewItem(item)
+
+@get_viewitem_for_item.register
+def _(item:str):
+	return TRTStringViewItem(item)
+
+@get_viewitem_for_item.register
+def _(item:datetime.datetime):
+	return TRTDateTimeViewItem(item)
