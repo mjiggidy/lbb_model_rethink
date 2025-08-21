@@ -16,6 +16,11 @@ class BinTreeView(QtWidgets.QTreeView):
 		
 		self.setModel(QtCore.QSortFilterProxyModel())
 		self.model().setSortRole(QtCore.Qt.ItemDataRole.InitialSortOrderRole)
+	
+	@QtCore.Slot()
+	def resizeAllColumnsToContents(self):
+		for idx in range(self.header().count()):
+			self.resizeColumnToContents(idx)
 
 
 class BinViewColumDefinitionsPresenter(presenters.LBItemDefinitionView):
@@ -87,16 +92,22 @@ class BinContentsPresenter(presenters.LBItemDefinitionView):
 			)
 	
 	@QtCore.Slot(object)
-	def setMobs(self, mobs:list[avb.trackgroups.Composition]):
+	def addMob(self, mob:avb.trackgroups.Composition):
 		
-		#self.viewModel().clear()
-
-		for mob in mobs:
-
-			item = {"Name": mob.name}
-			if "attributes" in mob.property_data and "_USER" in mob.attributes:
-				item.update(mob.attributes.get("_USER"))
-			self.addRow(item)
+		timecode_range = avbutils.get_timecode_range_for_composition(mob)
+		
+		item = {
+			"Name": mob.name,
+			"Color": viewitems.TRTClipColorViewItem(avbutils.composition_clip_color(mob)) if avbutils.composition_clip_color(mob) else "",
+			"Start": timecode_range.start,
+			"End": timecode_range.end,
+			"Duration": viewitems.TRTDurationViewItem(timecode_range.duration),
+			"Last Modified": mob.last_modified,
+			"Creation Date": mob.creation_time
+		}
+		if "attributes" in mob.property_data and "_USER" in mob.attributes:
+			item.update(mob.attributes.get("_USER"))
+		self.addRow(item)
 
 
 
@@ -107,7 +118,7 @@ class BinViewLoader(QtCore.QRunnable):
 
 		sig_begin_loading = QtCore.Signal()
 		sig_got_view_settings = QtCore.Signal(object)
-		sig_got_mobs = QtCore.Signal(object)
+		sig_got_mob = QtCore.Signal(object)
 		sig_done_loading = QtCore.Signal()
 
 	def __init__(self, bin_path:os.PathLike, *args, **kwargs):
@@ -119,16 +130,22 @@ class BinViewLoader(QtCore.QRunnable):
 		self._signals.sig_begin_loading.emit()
 
 		with avb.open(self._bin_path) as bin_handle:
-			view_settings = bin_handle.content.view_setting
-			view_settings.property_data = avb.core.AVBPropertyData(view_settings.property_data) # Dereference before closing file
-			self._signals.sig_got_view_settings.emit(view_settings)
+			self._loadBinView(bin_handle.content.view_setting)
 
-			toplevel_mobs = [i.mob for i in bin_handle.content.items if i.user_placed]
-			for mob in toplevel_mobs:
-				mob.attributes = dict(mob.attributes)
-			self._signals.sig_got_mobs.emit(toplevel_mobs)
+			self._loadCompositionMobs([i.mob for i in bin_handle.content.items if i.user_placed])
 		
 		self._signals.sig_done_loading.emit()
+	
+	def _loadBinView(self, bin_view:avb.bin.BinViewSetting):
+		bin_view.property_data = avb.core.AVBPropertyData(bin_view.property_data) # Dereference before closing file
+		self._signals.sig_got_view_settings.emit(bin_view)
+
+	def _loadCompositionMobs(self, compositions:avb.trackgroups.Composition):
+			
+			for comp in compositions:
+				comp.property_data = avb.core.AVBPropertyData(dict(comp.property_data))
+				self._signals.sig_got_mob.emit(comp)
+
 	
 	def signals(self) -> Signals:
 		return self._signals
@@ -146,8 +163,6 @@ class MainApplication(QtWidgets.QApplication):
 		self._col_defs_presenter = BinViewColumDefinitionsPresenter()
 		self._prop_data_presenter = BinViewPropertyDataPresenter()
 		self._contents_presenter = BinContentsPresenter()
-		#self.sig_load_bin_data.connect(self._col_defs_presenter.addRow)
-		#self.sig_load_bin_data.connect(self._col_defs_presenter.addRow)
 
 		self._btn_open = QtWidgets.QPushButton("Choose Bin...")
 		self._btn_open.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.FolderOpen))
@@ -167,11 +182,17 @@ class MainApplication(QtWidgets.QApplication):
 		self._wnd_main = QtWidgets.QMainWindow()
 		self._wnd_main.setCentralWidget(self._tree_bin_contents)
 
+
+		dock_font = QtWidgets.QDockWidget().font()
+		dock_font.setPointSizeF(dock_font.pointSizeF() * 0.8)
+
 		dock_propdefs = QtWidgets.QDockWidget("Property Data")
+		dock_propdefs.setFont(dock_font)
 		dock_propdefs.setWidget(self._tree_property_data)
 
 
 		dock_coldefs = QtWidgets.QDockWidget("Column Definitions")
+		dock_coldefs.setFont(dock_font)
 		dock_coldefs.setWidget(self._tree_column_defs)
 
 
@@ -184,12 +205,6 @@ class MainApplication(QtWidgets.QApplication):
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_btn_open)
 
 		self._wnd_main.show()
-
-
-		#self._tree_column_defs.show()
-		#self._tree_property_data.show()
-		#self._tree_bin_contents.show()
-		#self._btn_open.show()
 
 	def loadBin(self, bin_path:str):
 		"""Load the bin in another thread"""
@@ -204,7 +219,9 @@ class MainApplication(QtWidgets.QApplication):
 		self._worker.signals().sig_got_view_settings.connect(self._prop_data_presenter.setBinView)
 		self._worker.signals().sig_got_view_settings.connect(self._contents_presenter.setBinView)
 
-		self._worker.signals().sig_got_mobs.connect(self._contents_presenter.setMobs)
+		self._worker.signals().sig_got_mob.connect(self._contents_presenter.addMob)
+
+		self._worker.signals().sig_done_loading.connect(self._tree_bin_contents.resizeAllColumnsToContents)
 		self._threadpool.start(self._worker)
 	
 	@QtCore.Slot()
@@ -222,5 +239,6 @@ if __name__ == "__main__":
 		sys.exit(f"Usage: {pathlib.Path(__file__).name} path/to/avidbin.avb")
 	
 	app = MainApplication()
+	app.setStyle("Fusion")
 	app.loadBin(sys.argv[1])
 	sys.exit(app.exec())
