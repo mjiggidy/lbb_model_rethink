@@ -3,6 +3,20 @@ import avb, avbutils
 from PySide6 import QtCore, QtGui, QtWidgets
 from trt_model import presenters, viewitems
 
+class BinTreeView(QtWidgets.QTreeView):
+	"""QTreeView but nicer"""
+
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+
+		self.setSortingEnabled(True)
+		self.setIndentation(0)
+		self.setAlternatingRowColors(True)
+		self.setUniformRowHeights(True)
+		
+		self.setModel(QtCore.QSortFilterProxyModel())
+		self.model().setSortRole(QtCore.Qt.ItemDataRole.InitialSortOrderRole)
+
 
 class BinViewColumDefinitionsPresenter(presenters.LBItemDefinitionView):
 
@@ -139,38 +153,49 @@ class MainApplication(QtWidgets.QApplication):
 		self._btn_open.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.FolderOpen))
 		self._btn_open.clicked.connect(self.browseForBin)
 		
-		self._tree_column_defs = QtWidgets.QTreeView()
-		self._tree_column_defs.setModel(QtCore.QSortFilterProxyModel())
-		self._tree_column_defs.setSortingEnabled(True)
-		self._tree_column_defs.setIndentation(0)
-		self._tree_column_defs.model().setSortRole(QtCore.Qt.ItemDataRole.InitialSortOrderRole)
+		self._tree_column_defs = BinTreeView()
+
 		self._tree_column_defs.model().setSourceModel(self._col_defs_presenter.viewModel())
 
-		self._tree_property_data = QtWidgets.QTreeView()
-		self._tree_property_data.setModel(QtCore.QSortFilterProxyModel())
-		self._tree_property_data.setIndentation(0)
-		self._tree_property_data.setSortingEnabled(True)
-		self._tree_property_data.model().setSortRole(QtCore.Qt.ItemDataRole.InitialSortOrderRole)
+		self._tree_property_data = BinTreeView()
 		self._tree_property_data.model().setSourceModel(self._prop_data_presenter.viewModel())
 
-		self._tree_bin_contents = QtWidgets.QTreeView()
-		self._tree_bin_contents.setModel(QtCore.QSortFilterProxyModel())
-		self._tree_bin_contents.setIndentation(0)
-		self._tree_bin_contents.setSortingEnabled(True)
-		self._tree_bin_contents.model().setSortRole(QtCore.Qt.ItemDataRole.InitialSortOrderRole)
+		self._tree_bin_contents = BinTreeView()
 		self._tree_bin_contents.model().setSourceModel(self._contents_presenter.viewModel())
 
 
-		self._tree_column_defs.show()
-		self._tree_property_data.show()
-		self._tree_bin_contents.show()
-		self._btn_open.show()
+		self._wnd_main = QtWidgets.QMainWindow()
+		self._wnd_main.setCentralWidget(self._tree_bin_contents)
+
+		dock_propdefs = QtWidgets.QDockWidget("Property Data")
+		dock_propdefs.setWidget(self._tree_property_data)
+
+
+		dock_coldefs = QtWidgets.QDockWidget("Column Definitions")
+		dock_coldefs.setWidget(self._tree_column_defs)
+
+
+		dock_btn_open = QtWidgets.QDockWidget("Options")
+		dock_btn_open.setWidget(self._btn_open)
+
+
+		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_propdefs)
+		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_coldefs)
+		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_btn_open)
+
+		self._wnd_main.show()
+
+
+		#self._tree_column_defs.show()
+		#self._tree_property_data.show()
+		#self._tree_bin_contents.show()
+		#self._btn_open.show()
 
 	def loadBin(self, bin_path:str):
 		"""Load the bin in another thread"""
 
 		self._worker = BinViewLoader(bin_path)
-		self._worker.signals().sig_begin_loading.connect(lambda: self._tree_bin_contents.setWindowFilePath(bin_path))
+		self._worker.signals().sig_begin_loading.connect(lambda: self._wnd_main.setWindowFilePath(bin_path))
 		
 		self._worker.signals().sig_got_view_settings.connect(lambda binview: self._tree_column_defs.setWindowTitle(f"{binview.name} | Column Definitions"))
 		self._worker.signals().sig_got_view_settings.connect(lambda binview: self._tree_property_data.setWindowTitle(f"{binview.name} | Property Data"))
@@ -185,7 +210,9 @@ class MainApplication(QtWidgets.QApplication):
 	@QtCore.Slot()
 	def browseForBin(self):
 
-		file_path, _  = QtWidgets.QFileDialog.getOpenFileName(self._btn_open, "Choose an Avid bin...", filter="Avid Bin (*.avb);;All Files (*)")
+		file_path, _  = QtWidgets.QFileDialog.getOpenFileName(self._btn_open, "Choose an Avid bin...", filter="Avid Bin (*.avb);;All Files (*)", dir=self._wnd_main.windowFilePath())
+		if not file_path:
+			return
 		self.loadBin(file_path)
 
 if __name__ == "__main__":
