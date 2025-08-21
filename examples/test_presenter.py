@@ -35,7 +35,7 @@ class BinViewColumDefinitionsPresenter(presenters.LBItemDefinitionView):
 
 		super().addRow(column_definition)
 
-		
+
 
 class BinViewLoader(QtCore.QRunnable):
 	"""Load a given bin"""
@@ -89,6 +89,7 @@ class MainApplication(QtWidgets.QApplication):
 		"""Load the bin in another thread"""
 
 		self._worker = BinViewLoader(bin_path)
+		self._worker.signals().sig_begin_loading.connect(lambda: self._tree_viewer.setWindowFilePath(bin_path))
 		self._worker.signals().sig_got_view_settings.connect(self._col_defs_presenter.setBinView)
 		self._threadpool.start(self._worker)
 
