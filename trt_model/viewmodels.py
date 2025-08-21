@@ -65,8 +65,11 @@ class TRTTimelineViewModel(QtCore.QAbstractItemModel):
 		if orientation == QtCore.Qt.Orientation.Horizontal:
 			return self._headers[section].data(role)
 	
+	def fields(self) -> list[str]:
+		"""Field names for mapping headers and columns, in order"""
+		return [x.field_name() for x in self._headers]
+	
 	def addHeader(self, header:TRTAbstractViewHeaderItem) -> bool:
-		
 		self.beginInsertColumns(QtCore.QModelIndex(), 0, 0)
 		self._headers.insert(0, header)
 		self.endInsertColumns()
