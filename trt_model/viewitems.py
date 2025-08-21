@@ -67,7 +67,7 @@ class TRTAbstractViewItem:
 			QtCore.Qt.ItemDataRole.DisplayRole:          self.to_string(self._data),
 			QtCore.Qt.ItemDataRole.ToolTipRole:          self._tooltip if self._tooltip is not None else repr(self._data),
 			QtCore.Qt.ItemDataRole.DecorationRole:       self._icon,
-			QtCore.Qt.ItemDataRole.InitialSortOrderRole: avbutils.human_sort(str(self._data)),
+			QtCore.Qt.ItemDataRole.InitialSortOrderRole: self._data,
 			QtCore.Qt.ItemDataRole.UserRole:             self._data,
 		})
 
@@ -354,3 +354,7 @@ def _(item:str):
 @get_viewitem_for_item.register
 def _(item:datetime.datetime):
 	return TRTDateTimeViewItem(item)
+
+@get_viewitem_for_item.register
+def _(item:Timecode):
+	return TRTTimecodeViewItem(item)
