@@ -3,6 +3,52 @@ import avb, avbutils
 from PySide6 import QtCore, QtGui, QtWidgets
 from trt_model import presenters, viewitems
 
+class BinDisplayOptionsView(QtWidgets.QWidget):
+
+	sig_option_toggled  = QtCore.Signal(object, bool)
+	sig_options_changed = QtCore.Signal(object)
+
+	def __init__(self, *args, **kwargs):
+
+		super().__init__(*args, **kwargs)
+
+		self.setLayout(QtWidgets.QVBoxLayout())
+		self.layout().setSpacing(0)
+		self.layout().setContentsMargins(0,0,0,0)
+
+		self._option_mappings:dict[avbutils.BinDisplayOptions, QtWidgets.QCheckBox] = dict()
+
+		for option in avbutils.BinDisplayOptions:
+
+			chk_option = QtWidgets.QCheckBox(text=option.name.replace("_"," ").title())
+			chk_option.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
+			self._option_mappings[option] = chk_option
+			self.layout().addWidget(chk_option)
+		self.layout().addStretch()
+		
+	@QtCore.Slot(QtCore.Qt.CheckState)
+	def what(self, state:QtCore.Qt.CheckState):
+		print(state)
+	
+	@QtCore.Slot(object)
+	def _optionToggled(self, option:avbutils.BinDisplayOptions):
+		print(option)
+	
+	def setOptions(self, options:avbutils.BinDisplayOptions):
+		"""Set all options from a given `avbutils.BinDisplayOptions` enum"""
+
+		for option in self._option_mappings:
+			self.setOption(option, option in options)
+	
+	def setOption(self, option:avbutils.BinDisplayOptions, is_enabled:bool):
+		"""Toggle a single option"""
+
+		if not len(option) == 1:
+			raise ValueError("Only one option is allowed.  Use setOptions() for multiple flags.")
+
+		self._option_mappings[option].setChecked(is_enabled)
+
+
 class BinTreeView(QtWidgets.QTreeView):
 	"""QTreeView but nicer"""
 
@@ -94,19 +140,20 @@ class BinContentsPresenter(presenters.LBItemDefinitionView):
 	@QtCore.Slot(object)
 	def addMob(self, mob:avb.trackgroups.Composition):
 		
-		timecode_range = avbutils.get_timecode_range_for_composition(mob)
+		#timecode_range = avbutils.get_timecode_range_for_composition(mob)
 		
 		item = {
 			"Name": mob.name,
-			"Color": viewitems.TRTClipColorViewItem(avbutils.composition_clip_color(mob)) if avbutils.composition_clip_color(mob) else "",
-			"Start": timecode_range.start,
-			"End": timecode_range.end,
-			"Duration": viewitems.TRTDurationViewItem(timecode_range.duration),
+		#	"Color": viewitems.TRTClipColorViewItem(avbutils.composition_clip_color(mob)) if avbutils.composition_clip_color(mob) else "",
+		#	"Start": timecode_range.start,
+		#	"End": timecode_range.end,
+		#	"Duration": viewitems.TRTDurationViewItem(timecode_range.duration),
 			"Last Modified": mob.last_modified,
-			"Creation Date": mob.creation_time
+			"Creation Date": mob.creation_time,
+			"  ": avbutils.MobUsage(mob.usage_code)
 		}
-		if "attributes" in mob.property_data and "_USER" in mob.attributes:
-			item.update(mob.attributes.get("_USER"))
+		#if "attributes" in mob.property_data and "_USER" in mob.attributes:
+		#	item.update(mob.attributes.get("_USER"))
 		self.addRow(item)
 
 
@@ -117,6 +164,7 @@ class BinViewLoader(QtCore.QRunnable):
 	class Signals(QtCore.QObject):
 
 		sig_begin_loading = QtCore.Signal()
+		sig_got_display_options = QtCore.Signal(object)
 		sig_got_view_settings = QtCore.Signal(object)
 		sig_got_mob = QtCore.Signal(object)
 		sig_done_loading = QtCore.Signal()
@@ -130,11 +178,14 @@ class BinViewLoader(QtCore.QRunnable):
 		self._signals.sig_begin_loading.emit()
 
 		with avb.open(self._bin_path) as bin_handle:
+			self._loadBinDisplayOptions(bin_handle)
 			self._loadBinView(bin_handle.content.view_setting)
-
 			self._loadCompositionMobs([i.mob for i in bin_handle.content.items if i.user_placed])
 		
 		self._signals.sig_done_loading.emit()
+
+	def _loadBinDisplayOptions(self, bin_handle:avb.bin):
+		self._signals.sig_got_display_options.emit(avbutils.BinDisplayOptions.get_options_from_bin(bin_handle.content))
 	
 	def _loadBinView(self, bin_view:avb.bin.BinViewSetting):
 		bin_view.property_data = avb.core.AVBPropertyData(bin_view.property_data) # Dereference before closing file
@@ -143,7 +194,7 @@ class BinViewLoader(QtCore.QRunnable):
 	def _loadCompositionMobs(self, compositions:avb.trackgroups.Composition):
 			
 			for comp in compositions:
-				comp.property_data = avb.core.AVBPropertyData(dict(comp.property_data))
+				#comp.property_data = avb.core.AVBPropertyData(dict(comp.property_data))
 				self._signals.sig_got_mob.emit(comp)
 
 	
@@ -160,6 +211,11 @@ class MainApplication(QtWidgets.QApplication):
 
 		self._threadpool = QtCore.QThreadPool()
 
+		self._prog_loading = QtWidgets.QProgressBar()
+		self._prog_loading.setWindowModality(QtCore.Qt.WindowModality.NonModal)
+		self._prog_loading.setRange(0,0)
+		self._prog_loading.setWindowTitle("Loading bin...")
+
 		self._col_defs_presenter = BinViewColumDefinitionsPresenter()
 		self._prop_data_presenter = BinViewPropertyDataPresenter()
 		self._contents_presenter = BinContentsPresenter()
@@ -167,9 +223,10 @@ class MainApplication(QtWidgets.QApplication):
 		self._btn_open = QtWidgets.QPushButton("Choose Bin...")
 		self._btn_open.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.FolderOpen))
 		self._btn_open.clicked.connect(self.browseForBin)
-		
-		self._tree_column_defs = BinTreeView()
 
+		self._view_bindisplayoptions = BinDisplayOptionsView()
+				
+		self._tree_column_defs = BinTreeView()
 		self._tree_column_defs.model().setSourceModel(self._col_defs_presenter.viewModel())
 
 		self._tree_property_data = BinTreeView()
@@ -186,6 +243,10 @@ class MainApplication(QtWidgets.QApplication):
 		dock_font = QtWidgets.QDockWidget().font()
 		dock_font.setPointSizeF(dock_font.pointSizeF() * 0.8)
 
+		dock_displayoptions = QtWidgets.QDockWidget("Bin Display Options")
+		dock_displayoptions.setFont(dock_font)
+		dock_displayoptions.setWidget(self._view_bindisplayoptions)
+
 		dock_propdefs = QtWidgets.QDockWidget("Property Data")
 		dock_propdefs.setFont(dock_font)
 		dock_propdefs.setWidget(self._tree_property_data)
@@ -200,6 +261,7 @@ class MainApplication(QtWidgets.QApplication):
 		dock_btn_open.setWidget(self._btn_open)
 
 
+		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_displayoptions)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_propdefs)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_coldefs)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_btn_open)
@@ -211,6 +273,10 @@ class MainApplication(QtWidgets.QApplication):
 
 		self._worker = BinViewLoader(bin_path)
 		self._worker.signals().sig_begin_loading.connect(lambda: self._wnd_main.setWindowFilePath(bin_path))
+		self._worker.signals().sig_begin_loading.connect(lambda: self._wnd_main.setWindowFilePath(bin_path))
+		self._worker.signals().sig_begin_loading.connect(self._prog_loading.show)
+
+		self._worker.signals().sig_got_display_options.connect(self._view_bindisplayoptions.setOptions)
 		
 		self._worker.signals().sig_got_view_settings.connect(lambda binview: self._tree_column_defs.setWindowTitle(f"{binview.name} | Column Definitions"))
 		self._worker.signals().sig_got_view_settings.connect(lambda binview: self._tree_property_data.setWindowTitle(f"{binview.name} | Property Data"))
@@ -222,6 +288,14 @@ class MainApplication(QtWidgets.QApplication):
 		self._worker.signals().sig_got_mob.connect(self._contents_presenter.addMob)
 
 		self._worker.signals().sig_done_loading.connect(self._tree_bin_contents.resizeAllColumnsToContents)
+		self._worker.signals().sig_done_loading.connect(self._tree_column_defs.resizeAllColumnsToContents)
+		self._worker.signals().sig_done_loading.connect(self._tree_property_data.resizeAllColumnsToContents)
+
+		self._worker.signals().sig_done_loading.connect(lambda: self._tree_bin_contents.sortByColumn(0, QtCore.Qt.SortOrder.AscendingOrder))
+		self._worker.signals().sig_done_loading.connect(lambda: self._tree_column_defs.sortByColumn(0, QtCore.Qt.SortOrder.AscendingOrder))
+		self._worker.signals().sig_done_loading.connect(lambda: self._tree_property_data.sortByColumn(0, QtCore.Qt.SortOrder.AscendingOrder))
+
+		self._worker.signals().sig_done_loading.connect(self._prog_loading.hide)
 		self._threadpool.start(self._worker)
 	
 	@QtCore.Slot()
