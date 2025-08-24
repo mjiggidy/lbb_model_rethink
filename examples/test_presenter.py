@@ -132,29 +132,20 @@ class BinContentsPresenter(presenters.LBItemDefinitionView):
 
 			self.addHeader(
 				viewitems.TRTAbstractViewHeaderItem(
-					field_name=column["title"],
+					field_name="40_"+column["title"] if column["type"] == 40 else str(column["type"]),
 					display_name=column["title"]
 				)
 			)
 	
 	@QtCore.Slot(object)
-	def addMob(self, mob:avb.trackgroups.Composition):
+	def addMob(self, mob_info:dict):
 		
 		#timecode_range = avbutils.get_timecode_range_for_composition(mob)
 		
-		item = {
-			"Name": mob.name,
-		#	"Color": viewitems.TRTClipColorViewItem(avbutils.composition_clip_color(mob)) if avbutils.composition_clip_color(mob) else "",
-		#	"Start": timecode_range.start,
-		#	"End": timecode_range.end,
-		#	"Duration": viewitems.TRTDurationViewItem(timecode_range.duration),
-			"Last Modified": mob.last_modified,
-			"Creation Date": mob.creation_time,
-			"  ": avbutils.MobUsage(mob.usage_code)
-		}
+
 		#if "attributes" in mob.property_data and "_USER" in mob.attributes:
 		#	item.update(mob.attributes.get("_USER"))
-		self.addRow(item)
+		self.addRow(mob_info)
 
 
 
@@ -194,8 +185,27 @@ class BinViewLoader(QtCore.QRunnable):
 	def _loadCompositionMobs(self, compositions:avb.trackgroups.Composition):
 			
 			for comp in compositions:
-				#comp.property_data = avb.core.AVBPropertyData(dict(comp.property_data))
-				self._signals.sig_got_mob.emit(comp)
+				try:
+					timecode_range = avbutils.get_timecode_range_for_composition(comp)
+				except Exception:
+					timecode_range = None
+				item = {
+					avbutils.BIN_COLUMN_ROLES["Name"]: comp.name,
+					avbutils.BIN_COLUMN_ROLES["Color"]: viewitems.TRTClipColorViewItem(avbutils.composition_clip_color(comp)) if avbutils.composition_clip_color(comp) else "",
+					avbutils.BIN_COLUMN_ROLES["Start"]: timecode_range.start if timecode_range else None,
+					avbutils.BIN_COLUMN_ROLES["End"]: timecode_range.end if timecode_range else None,
+					avbutils.BIN_COLUMN_ROLES["Duration"]: viewitems.TRTDurationViewItem(timecode_range.duration) if timecode_range else None,
+					avbutils.BIN_COLUMN_ROLES["Modified Date"]: comp.last_modified,
+					avbutils.BIN_COLUMN_ROLES["Creation Date"]: comp.creation_time,
+					avbutils.BIN_COLUMN_ROLES[""]: avbutils.MobUsage(comp.usage_code)
+				}
+
+				for key, val in comp.attributes.get("_USER","{}").items():
+					item.update({"40_"+key: val})
+				
+				import pprint
+				pprint.pprint(item)
+				self._signals.sig_got_mob.emit(item)
 
 	
 	def signals(self) -> Signals:
@@ -212,7 +222,7 @@ class MainApplication(QtWidgets.QApplication):
 		self._threadpool = QtCore.QThreadPool()
 
 		self._prog_loading = QtWidgets.QProgressBar()
-		self._prog_loading.setWindowModality(QtCore.Qt.WindowModality.NonModal)
+		self._prog_loading.setWindowModality(QtCore.Qt.WindowModality.ApplicationModal)
 		self._prog_loading.setRange(0,0)
 		self._prog_loading.setWindowTitle("Loading bin...")
 
@@ -271,6 +281,8 @@ class MainApplication(QtWidgets.QApplication):
 	def loadBin(self, bin_path:str):
 		"""Load the bin in another thread"""
 
+
+		print(bin_path)
 		self._worker = BinViewLoader(bin_path)
 		self._worker.signals().sig_begin_loading.connect(lambda: self._wnd_main.setWindowFilePath(bin_path))
 		self._worker.signals().sig_begin_loading.connect(lambda: self._wnd_main.setWindowFilePath(bin_path))
