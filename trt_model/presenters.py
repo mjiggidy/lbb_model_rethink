@@ -24,12 +24,12 @@ class LBAbstractPresenter(QtCore.QObject):
 class LBItemDefinitionView(LBAbstractPresenter):
 
 	@QtCore.Slot(object)
-	def addRow(self, row_data:dict[viewitems.TRTAbstractViewHeaderItem|str,viewitems.TRTAbstractViewItem|typing.Any]):
+	def addRow(self, row_data:dict[viewitems.TRTAbstractViewHeaderItem|str,viewitems.TRTAbstractViewItem|typing.Any], add_new_headers:bool=False):
 		processed_row = dict()
 
 		for term, definition in row_data.items():
 			term = self._buildViewHeader(term)
-			if term.field_name() not in self.viewModel().fields():
+			if add_new_headers and term.field_name() not in self.viewModel().fields():
 				self.addHeader(term)
 			
 			definition = self._buildViewItem(definition)
