@@ -203,8 +203,6 @@ class BinViewLoader(QtCore.QRunnable):
 				for key, val in comp.attributes.get("_USER","{}").items():
 					item.update({"40_"+key: val})
 				
-				import pprint
-				pprint.pprint(item)
 				self._signals.sig_got_mob.emit(item)
 
 	
@@ -247,6 +245,7 @@ class MainApplication(QtWidgets.QApplication):
 
 
 		self._wnd_main = QtWidgets.QMainWindow()
+		self._wnd_main.resize(1024, 600)
 		self._wnd_main.setCentralWidget(self._tree_bin_contents)
 
 
@@ -271,9 +270,9 @@ class MainApplication(QtWidgets.QApplication):
 		dock_btn_open.setWidget(self._btn_open)
 
 
-		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_displayoptions)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_propdefs)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_coldefs)
+		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_displayoptions)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_btn_open)
 
 		self._wnd_main.show()
@@ -305,7 +304,7 @@ class MainApplication(QtWidgets.QApplication):
 
 		self._worker.signals().sig_done_loading.connect(lambda: self._tree_bin_contents.sortByColumn(0, QtCore.Qt.SortOrder.AscendingOrder))
 		self._worker.signals().sig_done_loading.connect(lambda: self._tree_column_defs.sortByColumn(0, QtCore.Qt.SortOrder.AscendingOrder))
-		self._worker.signals().sig_done_loading.connect(lambda: self._tree_property_data.sortByColumn(0, QtCore.Qt.SortOrder.AscendingOrder))
+		self._worker.signals().sig_done_loading.connect(lambda: self._tree_property_data.sortByColumn(0, QtCore.Qt.SortOrder.DescendingOrder))
 
 		self._worker.signals().sig_done_loading.connect(self._prog_loading.hide)
 		self._threadpool.start(self._worker)
