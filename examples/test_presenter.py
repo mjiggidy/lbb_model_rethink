@@ -184,11 +184,64 @@ class BinViewLoader(QtCore.QRunnable):
 
 	def _loadCompositionMobs(self, compositions:avb.trackgroups.Composition):
 			
+			def _group_ranges(ranges:list[int]) -> list:
+				index_groups = []
+				for idx in sorted(ranges):
+					if index_groups and index_groups[-1][-1] == idx -1:
+						index_groups[-1].append(idx)
+					else:
+						index_groups.append([idx])
+				
+				return index_groups
+
+			def _format_track_labels(tracks:list[avb.trackgroups.Track]) -> str:
+				
+				track_groups = {}
+
+				for track in tracks:
+					if track.media_kind not in track_groups:
+						track_groups[track.media_kind] = []
+					track_groups[track.media_kind].append(track.index)
+				
+					
+				formatted_labels = []
+				
+				if "picture" in track_groups:
+					ranges = _group_ranges(track_groups["picture"])
+					formatted_labels.append("V"+','.join([
+						f"{r[0]}-{r[-1]}" if len(r) > 1 else str(r[0]) for r in ranges
+					]))
+				if "sound" in track_groups:
+					ranges = _group_ranges(track_groups["sound"])
+					formatted_labels.append("A"+','.join([
+						f"{r[0]}-{r[-1]}" if len(r) > 1 else str(r[0]) for r in ranges
+					]))
+				if "DataEssenceTrack" in track_groups:
+					ranges = _group_ranges(track_groups["DataEssenceTrack"])
+					formatted_labels.append("D"+','.join([
+						f"{r[0]}-{r[-1]}" if len(r) > 1 else str(r[0]) for r in ranges
+					]))
+				if "timecode" in track_groups:
+					ranges = _group_ranges(track_groups["timecode"])
+					formatted_labels.append("TC"+','.join([
+						f"{r[0]}-{r[-1]}" if len(r) > 1 else str(r[0]) for r in ranges
+					]))
+				if "edgecode" in track_groups:
+					ranges = _group_ranges(track_groups["edgecode"])
+					formatted_labels.append("EC"+','.join([
+						f"{r[0]}-{r[-1]}" if len(r) > 1 else str(r[0]) for r in ranges
+					]))
+				
+				return " ".join(formatted_labels)
+			
 			for comp in compositions:
 				try:
 					timecode_range = avbutils.get_timecode_range_for_composition(comp)
 				except Exception:
 					timecode_range = None
+
+				markers = avbutils.get_markers_from_timeline(comp)
+
 				item = {
 					avbutils.BIN_COLUMN_ROLES["Name"]: comp.name,
 					avbutils.BIN_COLUMN_ROLES["Color"]: viewitems.TRTClipColorViewItem(avbutils.composition_clip_color(comp)) if avbutils.composition_clip_color(comp) else "",
@@ -197,7 +250,9 @@ class BinViewLoader(QtCore.QRunnable):
 					avbutils.BIN_COLUMN_ROLES["Duration"]: viewitems.TRTDurationViewItem(timecode_range.duration) if timecode_range else None,
 					avbutils.BIN_COLUMN_ROLES["Modified Date"]: comp.last_modified,
 					avbutils.BIN_COLUMN_ROLES["Creation Date"]: comp.creation_time,
-					avbutils.BIN_COLUMN_ROLES[""]: avbutils.MobUsage(comp.usage_code)
+					avbutils.BIN_COLUMN_ROLES[""]: avbutils.MobUsage(comp.usage_code),
+					avbutils.BIN_COLUMN_ROLES["Marker"]: viewitems.TRTMarkerViewItem(markers[0]) if markers else None,
+					avbutils.BIN_COLUMN_ROLES["Tracks"]: _format_track_labels(list(avbutils.get_tracks_from_composition(comp)))
 				}
 
 				for key, val in comp.attributes.get("_USER","{}").items():
