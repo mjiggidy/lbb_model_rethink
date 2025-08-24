@@ -306,6 +306,21 @@ class TRTClipColorViewItem(TRTAbstractViewItem):
 			"hex": self.data(QtCore.Qt.ItemDataRole.UserRole).name()
 		}
 
+class TRTMarkerViewItem(TRTAbstractViewItem):
+	"""Marker column"""
+
+	def __init__(self, raw_data:avbutils.MarkerInfo, *args, **kwargs):
+
+		super().__init__(raw_data, *args, **kwargs)
+		self._prepare_data()
+	
+	def _prepare_data(self):
+		super()._prepare_data()
+		self._data_roles.update({
+			QtCore.Qt.ItemDataRole.DisplayRole: None,
+			QtCore.Qt.ItemDataRole.BackgroundRole: QtGui.QColor(self._data.color.name),
+		})
+
 class TRTBinLockViewItem(TRTAbstractViewItem):
 	"""Bin lock info"""
 
