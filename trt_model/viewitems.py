@@ -285,6 +285,7 @@ class TRTClipColorViewItem(TRTAbstractViewItem):
 
 		self._data_roles.update({
 			QtCore.Qt.ItemDataRole.UserRole: self._data,
+			QtCore.Qt.ItemDataRole.BackgroundRole: self._data,
 			QtCore.Qt.ItemDataRole.ToolTipRole: f"R: {color.red()} G: {color.green()} B: {color.blue()}" if color.isValid() else None,
 			QtCore.Qt.ItemDataRole.InitialSortOrderRole: self._data.getRgb()
 		})
