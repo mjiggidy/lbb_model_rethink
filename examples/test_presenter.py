@@ -59,6 +59,7 @@ class BinTreeView(QtWidgets.QTreeView):
 		self.setIndentation(0)
 		self.setAlternatingRowColors(True)
 		self.setUniformRowHeights(True)
+		#self.setSelectionBehavior(self.SelectionBehavior.SelectRows)
 		
 		self.setModel((viewmodels.TRTSortFilterProxyModel()))
 		#self.model().setSortRole(QtCore.Qt.ItemDataRole.InitialSortOrderRole)
@@ -307,6 +308,7 @@ class MainApplication(QtWidgets.QApplication):
 				
 		self._tree_column_defs = BinTreeView()
 		self._tree_column_defs.model().setSourceModel(self._col_defs_presenter.viewModel())
+		self._tree_column_defs.activated.connect(self.focusBinColumn)
 
 		self._tree_property_data = BinTreeView()
 		self._tree_property_data.model().setSourceModel(self._prop_data_presenter.viewModel())
@@ -359,6 +361,48 @@ class MainApplication(QtWidgets.QApplication):
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_btn_open)
 
 		self._wnd_main.show()
+	
+	@QtCore.Slot(QtCore.QModelIndex)
+	def focusBinColumn(self, index:QtCore.QModelIndex):
+
+		# TODO: Probably re-work
+
+		# Get column name from column defs list
+		headers = [self._tree_column_defs.model().headerData(idx, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.DisplayRole) for idx in range(self._tree_column_defs.header().count())]
+		print(headers)
+
+		# Find column index for "Title"
+		try:
+			idx_name = headers.index("Title")
+		except ValueError:
+			return
+		
+		column_name = index.siblingAtColumn(idx_name).data(QtCore.Qt.ItemDataRole.DisplayRole)
+		
+		print("Focus on ", column_name)
+
+		
+		# Figure out where the column is in bin contents tree
+		tree_names = [self._tree_bin_contents.model().headerData(idx,
+				QtCore.Qt.Orientation.Horizontal,
+				QtCore.Qt.ItemDataRole.DisplayRole
+			)
+			for idx in range(self._tree_bin_contents.header().count())
+		]
+
+		try:
+			idx_tree_name = tree_names.index(column_name)
+		except ValueError:
+			return
+		
+		selected = self._tree_bin_contents.selectedIndexes()
+
+		selected = selected[0] if selected else self._tree_bin_contents.model().index(0, 0, QtCore.QModelIndex())
+		
+		self._tree_bin_contents.scrollTo(selected.siblingAtColumn(idx_tree_name), self._tree_bin_contents.ScrollHint.EnsureVisible)
+		
+
+
 	
 	@QtCore.Slot(object)
 	def sortBinContents(self, sorting:list[tuple[QtCore.Qt.SortOrder, str]]):
