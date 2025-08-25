@@ -217,7 +217,7 @@ class BinViewLoader(QtCore.QRunnable):
 			self._loadBinDisplayOptions(bin_handle)
 			self._loadBinView(bin_handle.content.view_setting)
 			self._loadBinSorting(bin_handle.content.sort_columns)
-			self._loadCompositionMobs([i.mob for i in bin_handle.content.items if i.user_placed])
+			self._loadCompositionMobs(bin_handle.content.items)
 		
 		self._signals.sig_done_loading.emit()
 
@@ -231,9 +231,11 @@ class BinViewLoader(QtCore.QRunnable):
 	def _loadBinSorting(self, bin_sorting:list):
 		self.signals().sig_got_sort_settings.emit(bin_sorting)
 
-	def _loadCompositionMobs(self, compositions:avb.trackgroups.Composition):
+	def _loadCompositionMobs(self, bin_items:list[avb.bin.BinItem]):
 			
-			for comp in compositions:
+			
+			
+			for comp in [i.mob for i in bin_items]:
 				if avbutils.composition_is_toplevel(comp):
 					timecode_range = avbutils.get_timecode_range_for_composition(comp)
 					tape_name = None
