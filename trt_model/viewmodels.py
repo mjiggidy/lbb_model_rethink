@@ -6,10 +6,25 @@ from .viewitems import TRTAbstractViewItem, TRTAbstractViewHeaderItem
 from PySide6 import QtCore
 
 class TRTSortFilterProxyModel(QtCore.QSortFilterProxyModel):
+	"""QSortFilterProxyModel that implements natural sorting and such"""
 
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
+
+		# Sort mimicking Avid natural sorting (9 before 10, etc)
+		self._sort_collator = QtCore.QCollator()
+		self._sort_collator.setNumericMode(True)
+		self._sort_collator.setCaseSensitivity(QtCore.Qt.CaseSensitivity.CaseInsensitive)
+
 		self.setSortRole(QtCore.Qt.ItemDataRole.InitialSortOrderRole)
+	
+	def lessThan(self, source_left:QtCore.QModelIndex, source_right:QtCore.QModelIndex) -> bool:
+		return self._sort_collator.compare(
+			source_left.data(self.sortRole()),
+			source_right.data(self.sortRole())
+		) <= 0	# gt OR EQUAL TO reverses sort even if all thingies are equal, I like it
+		
+		#return super().lessThan(source_left, source_right)
 	
 
 class TRTTimelineViewModel(QtCore.QAbstractItemModel):

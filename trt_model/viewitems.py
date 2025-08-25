@@ -67,7 +67,7 @@ class TRTAbstractViewItem:
 			QtCore.Qt.ItemDataRole.DisplayRole:          self.to_string(self._data),
 			QtCore.Qt.ItemDataRole.ToolTipRole:          self._tooltip if self._tooltip is not None else repr(self._data),
 			QtCore.Qt.ItemDataRole.DecorationRole:       self._icon,
-			QtCore.Qt.ItemDataRole.InitialSortOrderRole: self._data,
+			QtCore.Qt.ItemDataRole.InitialSortOrderRole: self.to_string(self._data),	# QCollator just compares strings
 			QtCore.Qt.ItemDataRole.UserRole:             self._data,
 		})
 
@@ -98,7 +98,7 @@ class TRTStringViewItem(TRTAbstractViewItem):
 		super()._prepare_data()
 
 		self._data_roles.update({
-			QtCore.Qt.ItemDataRole.DisplayRole:          str(self._data),
+			QtCore.Qt.ItemDataRole.DisplayRole: self.to_string(self._data),
 		})
 
 class TRTEnumViewItem(TRTAbstractViewItem):
@@ -112,7 +112,7 @@ class TRTEnumViewItem(TRTAbstractViewItem):
 
 		self._data_roles.update({
 			QtCore.Qt.ItemDataRole.DisplayRole:          self._data.name.replace("_", " ").title(),
-			QtCore.Qt.ItemDataRole.InitialSortOrderRole: self._data.value,
+			QtCore.Qt.ItemDataRole.InitialSortOrderRole: self.to_string(self._data.value),
 		})
 	
 
@@ -130,7 +130,7 @@ class TRTNumericViewItem(TRTAbstractViewItem):
 
 		self._data_roles.update({
 			QtCore.Qt.ItemDataRole.DisplayRole:          self.to_string(self._data),
-			QtCore.Qt.ItemDataRole.InitialSortOrderRole: self._data,
+			#QtCore.Qt.ItemDataRole.InitialSortOrderRole: self._data,
 			QtCore.Qt.ItemDataRole.FontRole:             QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.SystemFont.FixedFont),
 		})
 	
@@ -152,7 +152,7 @@ class TRTPathViewItem(TRTAbstractViewItem):
 
 		self._data_roles.update({
 			QtCore.Qt.ItemDataRole.DisplayRole:          self._data.fileName(),
-			QtCore.Qt.ItemDataRole.InitialSortOrderRole: avbutils.human_sort(self._data.fileName()),
+			QtCore.Qt.ItemDataRole.InitialSortOrderRole: self._data.fileName(),
 			QtCore.Qt.ItemDataRole.DecorationRole:       QtWidgets.QFileIconProvider().icon(self._data),
 			QtCore.Qt.ItemDataRole.ToolTipRole:          QtCore.QDir.toNativeSeparators(self._data.absoluteFilePath()),
 		})
@@ -183,6 +183,7 @@ class TRTDateTimeViewItem(TRTAbstractViewItem):
 	
 		self._data_roles.update({
 			QtCore.Qt.ItemDataRole.DisplayRole: self._data.toString(self._format_string),
+			QtCore.Qt.ItemDataRole.InitialSortOrderRole: str(self._data.toMSecsSinceEpoch())
 		})
 	
 	def to_json(self) -> dict:
@@ -203,7 +204,7 @@ class TRTTimecodeViewItem(TRTNumericViewItem):
 	def _prepare_data(self):
 		super()._prepare_data()
 		self._data_roles.update({
-			QtCore.Qt.ItemDataRole.InitialSortOrderRole: self._data.frame_number,
+			QtCore.Qt.ItemDataRole.InitialSortOrderRole: str(self._data.frame_number),
 		})
 	
 	def to_json(self) -> dict:
@@ -287,7 +288,7 @@ class TRTClipColorViewItem(TRTAbstractViewItem):
 			QtCore.Qt.ItemDataRole.UserRole: self._data,
 			QtCore.Qt.ItemDataRole.BackgroundRole: self._data,
 			QtCore.Qt.ItemDataRole.ToolTipRole: f"R: {color.red()} G: {color.green()} B: {color.blue()}" if color.isValid() else None,
-			QtCore.Qt.ItemDataRole.InitialSortOrderRole: self._data.getRgb()
+			QtCore.Qt.ItemDataRole.InitialSortOrderRole: self.to_string(self._data.getRgb())
 		})
 	
 	def to_json(self) -> dict|None:

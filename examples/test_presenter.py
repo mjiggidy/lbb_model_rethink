@@ -1,7 +1,7 @@
 import sys, os
 import avb, avbutils
 from PySide6 import QtCore, QtGui, QtWidgets
-from trt_model import presenters, viewitems
+from trt_model import presenters, viewitems, viewmodels
 
 class BinDisplayOptionsView(QtWidgets.QWidget):
 
@@ -60,8 +60,8 @@ class BinTreeView(QtWidgets.QTreeView):
 		self.setAlternatingRowColors(True)
 		self.setUniformRowHeights(True)
 		
-		self.setModel(QtCore.QSortFilterProxyModel())
-		self.model().setSortRole(QtCore.Qt.ItemDataRole.InitialSortOrderRole)
+		self.setModel((viewmodels.TRTSortFilterProxyModel()))
+		#self.model().setSortRole(QtCore.Qt.ItemDataRole.InitialSortOrderRole)
 	
 	@QtCore.Slot()
 	def resizeAllColumnsToContents(self):
@@ -339,11 +339,13 @@ class MainApplication(QtWidgets.QApplication):
 
 if __name__ == "__main__":
 
-	if len(sys.argv) < 2:
-		import pathlib
-		sys.exit(f"Usage: {pathlib.Path(__file__).name} path/to/avidbin.avb")
 	
 	app = MainApplication()
 	app.setStyle("Fusion")
-	app.loadBin(sys.argv[1])
+
+	if len(sys.argv) < 2:
+		app.browseForBin()
+	else:
+		app.loadBin(sys.argv[1])
+		
 	sys.exit(app.exec())
