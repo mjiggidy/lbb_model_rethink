@@ -67,6 +67,27 @@ class BinTreeView(QtWidgets.QTreeView):
 	def resizeAllColumnsToContents(self):
 		for idx in range(self.header().count()):
 			self.resizeColumnToContents(idx)
+	
+	@QtCore.Slot(str, QtCore.Qt.SortOrder)
+	def sortByColumnName(self, column_name:str, sort_order:QtCore.Qt.SortOrder) -> bool:
+		"""Sort by a column's display name"""
+
+		# Get all column names
+		column_names = [
+			self.model().headerData(idx,
+				QtCore.Qt.Orientation.Horizontal,
+				QtCore.Qt.ItemDataRole.DisplayRole
+			)
+			for idx in range(self.header().count())
+		]
+
+		try:
+			header_index = column_names.index(column_name)
+		except ValueError:
+			return False
+
+		self.sortByColumn(header_index, sort_order)
+		return True
 
 
 class BinViewColumDefinitionsPresenter(presenters.LBItemDefinitionView):
@@ -118,6 +139,34 @@ class BinViewPropertyDataPresenter(presenters.LBItemDefinitionView):
 		for key,val in bin_view.property_data.items():
 			self.addRow({"name": key, "value": val})
 
+class BinSortingPropertiesPresenter(presenters.LBItemDefinitionView):
+	"""Bin sorting"""
+
+	sig_bin_sorting_changed = QtCore.Signal(object)
+
+	@QtCore.Slot(object)
+	def setBinSortingProperties(self, sorting:list[int,str]):
+		
+		self.viewModel().clear()
+
+		headers = [
+			viewitems.TRTAbstractViewHeaderItem("order", "Order"),
+			viewitems.TRTAbstractViewHeaderItem("direction", "Direction"),
+			viewitems.TRTAbstractViewHeaderItem("column", "Column")
+		]
+
+		for header in headers[::-1]:
+			self.addHeader(header)
+		
+		for order, (direction, column_name) in enumerate(sorting):
+			self.addRow({
+				"order": order,
+				"direction": QtCore.Qt.SortOrder(direction),
+				"column": column_name
+			})
+		
+		self.sig_bin_sorting_changed.emit([(QtCore.Qt.SortOrder(direction), column_name) for direction, column_name in sorting])
+
 class BinContentsPresenter(presenters.LBItemDefinitionView):
 
 	@QtCore.Slot(object)
@@ -139,12 +188,6 @@ class BinContentsPresenter(presenters.LBItemDefinitionView):
 	
 	@QtCore.Slot(object)
 	def addMob(self, mob_info:dict):
-		
-		#timecode_range = avbutils.get_timecode_range_for_composition(mob)
-		
-
-		#if "attributes" in mob.property_data and "_USER" in mob.attributes:
-		#	item.update(mob.attributes.get("_USER"))
 		self.addRow(mob_info)
 
 
@@ -158,6 +201,7 @@ class BinViewLoader(QtCore.QRunnable):
 		sig_got_display_options = QtCore.Signal(object)
 		sig_got_view_settings = QtCore.Signal(object)
 		sig_got_mob = QtCore.Signal(object)
+		sig_got_sort_settings = QtCore.Signal(object)
 		sig_done_loading = QtCore.Signal()
 
 	def __init__(self, bin_path:os.PathLike, *args, **kwargs):
@@ -171,6 +215,7 @@ class BinViewLoader(QtCore.QRunnable):
 		with avb.open(self._bin_path) as bin_handle:
 			self._loadBinDisplayOptions(bin_handle)
 			self._loadBinView(bin_handle.content.view_setting)
+			self._loadBinSorting(bin_handle.content.sort_columns)
 			self._loadCompositionMobs([i.mob for i in bin_handle.content.items if i.user_placed])
 		
 		self._signals.sig_done_loading.emit()
@@ -181,6 +226,9 @@ class BinViewLoader(QtCore.QRunnable):
 	def _loadBinView(self, bin_view:avb.bin.BinViewSetting):
 		bin_view.property_data = avb.core.AVBPropertyData(bin_view.property_data) # Dereference before closing file
 		self._signals.sig_got_view_settings.emit(bin_view)
+	
+	def _loadBinSorting(self, bin_sorting:list):
+		self.signals().sig_got_sort_settings.emit(bin_sorting)
 
 	def _loadCompositionMobs(self, compositions:avb.trackgroups.Composition):
 			
@@ -247,6 +295,9 @@ class MainApplication(QtWidgets.QApplication):
 		self._col_defs_presenter = BinViewColumDefinitionsPresenter()
 		self._prop_data_presenter = BinViewPropertyDataPresenter()
 		self._contents_presenter = BinContentsPresenter()
+		self._sorting_presenter = BinSortingPropertiesPresenter()
+
+		self._sorting_presenter.sig_bin_sorting_changed.connect(self.sortBinContents)
 
 		self._btn_open = QtWidgets.QPushButton("Choose Bin...")
 		self._btn_open.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.FolderOpen))
@@ -261,8 +312,13 @@ class MainApplication(QtWidgets.QApplication):
 		self._tree_property_data.model().setSourceModel(self._prop_data_presenter.viewModel())
 
 		self._tree_bin_contents = BinTreeView()
+		font = self._tree_bin_contents.font()
+		font.setPointSizeF(font.pointSizeF() * 0.85)
+		self._tree_bin_contents.setFont(font)
 		self._tree_bin_contents.model().setSourceModel(self._contents_presenter.viewModel())
 
+		self._tree_sort_properties = BinTreeView()
+		self._tree_sort_properties.model().setSourceModel(self._sorting_presenter.viewModel())
 
 		self._wnd_main = QtWidgets.QMainWindow()
 		self._wnd_main.resize(1024, 600)
@@ -274,7 +330,8 @@ class MainApplication(QtWidgets.QApplication):
 
 		dock_displayoptions = QtWidgets.QDockWidget("Bin Display Options")
 		dock_displayoptions.setFont(dock_font)
-		dock_displayoptions.setWidget(self._view_bindisplayoptions)
+		dock_displayoptions.setWidget(QtWidgets.QScrollArea())
+		dock_displayoptions.widget().setWidget(self._view_bindisplayoptions)
 
 		dock_propdefs = QtWidgets.QDockWidget("Property Data")
 		dock_propdefs.setFont(dock_font)
@@ -287,15 +344,34 @@ class MainApplication(QtWidgets.QApplication):
 
 
 		dock_btn_open = QtWidgets.QDockWidget("Options")
+		dock_btn_open.setFont(dock_font)
 		dock_btn_open.setWidget(self._btn_open)
 
+		dock_sortoptions = QtWidgets.QDockWidget("Bin Sorting")
+		dock_sortoptions.setFont(dock_font)
+		dock_sortoptions.setWidget(self._tree_sort_properties)
 
+
+		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_sortoptions)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_propdefs)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_coldefs)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_displayoptions)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_btn_open)
 
 		self._wnd_main.show()
+	
+	@QtCore.Slot(object)
+	def sortBinContents(self, sorting:list[tuple[QtCore.Qt.SortOrder, str]]):
+		
+		# Get column names from treeview
+		names = []
+		for column in range(self._tree_bin_contents.header().count()):
+			names.append(self._tree_bin_contents.model().headerData(column, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.DisplayRole))
+
+		#print(names)
+
+		for direction, column_name in sorting:
+			self._tree_bin_contents.sortByColumnName(column_name, direction)
 
 	def loadBin(self, bin_path:str):
 		"""Load the bin in another thread"""
@@ -316,13 +392,16 @@ class MainApplication(QtWidgets.QApplication):
 		self._worker.signals().sig_got_view_settings.connect(self._prop_data_presenter.setBinView)
 		self._worker.signals().sig_got_view_settings.connect(self._contents_presenter.setBinView)
 
+		self._worker.signals().sig_got_sort_settings.connect(self._sorting_presenter.setBinSortingProperties)
+
 		self._worker.signals().sig_got_mob.connect(self._contents_presenter.addMob)
 
 		self._worker.signals().sig_done_loading.connect(self._tree_bin_contents.resizeAllColumnsToContents)
 		self._worker.signals().sig_done_loading.connect(self._tree_column_defs.resizeAllColumnsToContents)
 		self._worker.signals().sig_done_loading.connect(self._tree_property_data.resizeAllColumnsToContents)
+		self._worker.signals().sig_done_loading.connect(self._tree_sort_properties.resizeAllColumnsToContents)
 
-		self._worker.signals().sig_done_loading.connect(lambda: self._tree_bin_contents.sortByColumn(0, QtCore.Qt.SortOrder.AscendingOrder))
+		#self._worker.signals().sig_done_loading.connect(lambda: self._tree_bin_contents.sortByColumn(0, QtCore.Qt.SortOrder.AscendingOrder))
 		self._worker.signals().sig_done_loading.connect(lambda: self._tree_column_defs.sortByColumn(0, QtCore.Qt.SortOrder.AscendingOrder))
 		self._worker.signals().sig_done_loading.connect(lambda: self._tree_property_data.sortByColumn(0, QtCore.Qt.SortOrder.DescendingOrder))
 
