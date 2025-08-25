@@ -189,18 +189,20 @@ class BinViewLoader(QtCore.QRunnable):
 					timecode_range = avbutils.get_timecode_range_for_composition(comp)
 					tape_name = None
 				else:
-					try:
-						import timecode
-						source_mob = avbutils.matchback_to_sourcemob(comp)
-						tape_name = source_mob.name
-						source_mob_timecode_range = avbutils.get_timecode_range_for_composition(source_mob)
-						timecode_range = timecode.TimecodeRange(start=source_mob_timecode_range.start, duration=comp.length)
-					except Exception as e:
-						print(type(e))
-						tape_name=None
-						timecode_range = None
+
+					import timecode
+					source_mob = avbutils.matchback_to_sourcemob(comp)
+					tape_name = source_mob.name
+					source_mob_timecode_range = avbutils.get_timecode_range_for_composition(source_mob)
+					timecode_range = timecode.TimecodeRange(start=source_mob_timecode_range.start, duration=comp.length)
+
+					#timecode_range = None
+					#tape_name = ""
+						
+
 
 				markers = avbutils.get_markers_from_timeline(comp)
+				#print(comp.property_data)
 
 				item = {
 					avbutils.BIN_COLUMN_ROLES["Name"]: comp.name,
@@ -214,6 +216,8 @@ class BinViewLoader(QtCore.QRunnable):
 					avbutils.BIN_COLUMN_ROLES["Marker"]: viewitems.TRTMarkerViewItem(markers[0]) if markers else None,
 					avbutils.BIN_COLUMN_ROLES["Tracks"]: avbutils.format_track_labels(list(avbutils.get_tracks_from_composition(comp))),
 					avbutils.BIN_COLUMN_ROLES["Tape"]: tape_name,
+					avbutils.BIN_COLUMN_ROLES["Scene"]: comp.attributes.get("_USER",{}).get("Scene"),
+					avbutils.BIN_COLUMN_ROLES["Take"]: comp.attributes.get("_USER",{}).get("Take")
 				}
 
 				for key, val in comp.attributes.get("_USER","{}").items():
