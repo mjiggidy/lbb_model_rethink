@@ -1,7 +1,7 @@
 import sys, os
 import avb, avbutils
 from PySide6 import QtCore, QtGui, QtWidgets
-from trt_model import presenters, viewitems, viewmodels
+from trt_model import presenters, viewitems, viewmodels, delegates
 
 class BinDisplayOptionsView(QtWidgets.QWidget):
 
@@ -89,6 +89,8 @@ class BinTreeView(QtWidgets.QTreeView):
 
 		self.sortByColumn(header_index, sort_order)
 		return True
+	
+	
 
 
 class BinViewColumDefinitionsPresenter(presenters.LBItemDefinitionView):
@@ -233,19 +235,34 @@ class BinViewLoader(QtCore.QRunnable):
 
 	def _loadCompositionMobs(self, bin_items:list[avb.bin.BinItem]):
 			
+			import timecode
 			
-			
-			for comp in [i.mob for i in bin_items]:
+			for bin_item in bin_items:
+
+				if not bin_item.user_placed:
+					continue
+				
+				display_options = avbutils.BinDisplayOptions.from_bin_item(bin_item)
+				#print(display_options)
+
+				comp = bin_item.mob
 				if avbutils.composition_is_toplevel(comp):
 					timecode_range = avbutils.get_timecode_range_for_composition(comp)
 					tape_name = None
-				else:
 
-					import timecode
-					source_mob = avbutils.matchback_to_sourcemob(comp)
-					tape_name = source_mob.name
-					source_mob_timecode_range = avbutils.get_timecode_range_for_composition(source_mob)
-					timecode_range = timecode.TimecodeRange(start=source_mob_timecode_range.start, duration=comp.length)
+				else:
+					try:
+						source_mob = avbutils.matchback_to_sourcemob(comp) if not avbutils.is_sourcemob(comp) else comp
+					except Exception as e:
+						print(source_mob, e)
+						pass
+					tape_name = source_mob.name if source_mob else None
+					try:
+						source_mob_timecode_range = avbutils.get_timecode_range_for_composition(source_mob) if source_mob else None
+						timecode_range = timecode.TimecodeRange(start=source_mob_timecode_range.start, duration=comp.length) if source_mob else None
+					except:
+						timecode_range = timecode.TimecodeRange(start=timecode.Timecode(0, rate=round(comp.edit_rate)), duration=0)
+						
 
 					#timecode_range = None
 					#tape_name = ""
@@ -257,13 +274,13 @@ class BinViewLoader(QtCore.QRunnable):
 
 				item = {
 					avbutils.BIN_COLUMN_ROLES["Name"]: comp.name,
-					avbutils.BIN_COLUMN_ROLES["Color"]: viewitems.TRTClipColorViewItem(avbutils.composition_clip_color(comp)) if avbutils.composition_clip_color(comp) else "",
-					avbutils.BIN_COLUMN_ROLES["Start"]: timecode_range.start if timecode_range else None,
-					avbutils.BIN_COLUMN_ROLES["End"]: timecode_range.end if timecode_range else None,
-					avbutils.BIN_COLUMN_ROLES["Duration"]: viewitems.TRTDurationViewItem(timecode_range.duration) if timecode_range else None,
+					avbutils.BIN_COLUMN_ROLES["Color"]: viewitems.TRTClipColorViewItem(avbutils.composition_clip_color(comp) if avbutils.composition_clip_color(comp) else None),
+					avbutils.BIN_COLUMN_ROLES["Start"]: timecode_range.start,
+					avbutils.BIN_COLUMN_ROLES["End"]: timecode_range.end,
+					avbutils.BIN_COLUMN_ROLES["Duration"]: viewitems.TRTDurationViewItem(timecode_range.duration),
 					avbutils.BIN_COLUMN_ROLES["Modified Date"]: comp.last_modified,
 					avbutils.BIN_COLUMN_ROLES["Creation Date"]: comp.creation_time,
-					avbutils.BIN_COLUMN_ROLES[""]: avbutils.MobUsage(comp.usage_code),
+					avbutils.BIN_COLUMN_ROLES[""]: display_options,
 					avbutils.BIN_COLUMN_ROLES["Marker"]: viewitems.TRTMarkerViewItem(markers[0]) if markers else None,
 					avbutils.BIN_COLUMN_ROLES["Tracks"]: avbutils.format_track_labels(list(avbutils.get_tracks_from_composition(comp))),
 					avbutils.BIN_COLUMN_ROLES["Tape"]: tape_name,
@@ -316,10 +333,11 @@ class MainApplication(QtWidgets.QApplication):
 		self._tree_property_data.model().setSourceModel(self._prop_data_presenter.viewModel())
 
 		self._tree_bin_contents = BinTreeView()
-		font = self._tree_bin_contents.font()
-		font.setPointSizeF(font.pointSizeF() * 0.85)
-		self._tree_bin_contents.setFont(font)
+		#font = self._tree_bin_contents.font()
+		#font.setPointSizeF(font.pointSizeF() * 0.95)
+		#self._tree_bin_contents.setFont(font)
 		self._tree_bin_contents.model().setSourceModel(self._contents_presenter.viewModel())
+		self._tree_bin_contents.setItemDelegateForColumn(0, delegates.LBClipColorItemDelegate())
 
 		self._tree_sort_properties = BinTreeView()
 		self._tree_sort_properties.model().setSourceModel(self._sorting_presenter.viewModel())
@@ -371,7 +389,7 @@ class MainApplication(QtWidgets.QApplication):
 
 		# Get column name from column defs list
 		headers = [self._tree_column_defs.model().headerData(idx, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.DisplayRole) for idx in range(self._tree_column_defs.header().count())]
-		print(headers)
+		#print(headers)
 
 		# Find column index for "Title"
 		try:
@@ -381,7 +399,7 @@ class MainApplication(QtWidgets.QApplication):
 		
 		column_name = index.siblingAtColumn(idx_name).data(QtCore.Qt.ItemDataRole.DisplayRole)
 		
-		print("Focus on ", column_name)
+		#print("Focus on ", column_name)
 
 		
 		# Figure out where the column is in bin contents tree
