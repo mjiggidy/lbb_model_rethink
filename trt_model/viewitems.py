@@ -268,12 +268,14 @@ class TRTFeetFramesViewItem(TRTNumericViewItem):
 class TRTClipColorViewItem(TRTAbstractViewItem):
 	"""A clip color"""
 
-	def __init__(self, raw_data:avbutils.ClipColor|QtGui.QRgba64, *args, **kwargs):
+	def __init__(self, raw_data:avbutils.ClipColor|QtGui.QRgba64|None, *args, **kwargs):
 
 		if isinstance(raw_data, avbutils.ClipColor):
 			raw_data = QtGui.QColor.fromRgba64(*raw_data.as_rgb16())
 		elif isinstance(raw_data, QtGui.QRgba64):
 			raw_data = QtGui.QColor.fromRgba64(raw_data)
+		elif raw_data is None:
+			raw_data = QtGui.QColor()
 		elif not isinstance(raw_data, QtGui.QColor):
 			raise TypeError(f"Data must be a QColor object (got {type(raw_data)})")
 		
@@ -286,8 +288,8 @@ class TRTClipColorViewItem(TRTAbstractViewItem):
 
 		self._data_roles.update({
 			QtCore.Qt.ItemDataRole.UserRole: self._data,
-			QtCore.Qt.ItemDataRole.BackgroundRole: self._data,
-			QtCore.Qt.ItemDataRole.ToolTipRole: f"R: {color.red()} G: {color.green()} B: {color.blue()}" if color.isValid() else None,
+			#QtCore.Qt.ItemDataRole.BackgroundRole: self._data,
+			QtCore.Qt.ItemDataRole.ToolTipRole: f"R: {color.red()} G: {color.green()} B: {color.blue()}" if color.isValid() else "No Color",
 			QtCore.Qt.ItemDataRole.InitialSortOrderRole: self.to_string(self._data.getRgb())
 		})
 	
