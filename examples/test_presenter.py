@@ -48,6 +48,24 @@ class BinDisplayOptionsView(QtWidgets.QWidget):
 
 		self._option_mappings[option].setChecked(is_enabled)
 
+class BinSiftSettingsView(QtWidgets.QWidget):
+
+	def __init__(self, *args, **kwargs):
+
+		super().__init__(*args, **kwargs)
+
+		self.setContentsMargins(0,0,0,0)
+
+		self.setLayout(QtWidgets.QVBoxLayout())
+		self.layout().setContentsMargins(0,0,0,0)
+
+		self._chk_sift_enabled = QtWidgets.QCheckBox("Sift Enabled")
+
+		self._tree_siftsettings = BinTreeView()
+
+		self.layout().addWidget(self._chk_sift_enabled)
+		self.layout().addWidget(self._tree_siftsettings)
+
 
 class BinTreeView(QtWidgets.QTreeView):
 	"""QTreeView but nicer"""
@@ -170,6 +188,26 @@ class BinSortingPropertiesPresenter(presenters.LBItemDefinitionView):
 		
 		self.sig_bin_sorting_changed.emit([(QtCore.Qt.SortOrder(direction), column_name) for direction, column_name in sorting])
 
+class BinSiftSettingsPresenter(presenters.LBItemDefinitionView):
+
+	sig_sift_enabled = QtCore.Signal(bool)
+	sig_sift_settings = QtCore.Signal(list)
+
+	@QtCore.Slot(bool, object)
+	def setSiftSettings(self, sift_enabled:bool, sift_settings:list[avb.bin.SiftItem]):
+		self.sig_sift_enabled.emit(sift_enabled)
+
+		self.addHeader(viewitems.TRTAbstractViewHeaderItem(field_name="string", display_name="String"))
+		self.addHeader(viewitems.TRTAbstractViewHeaderItem(field_name="method", display_name="Method"))
+		self.addHeader(viewitems.TRTAbstractViewHeaderItem(field_name="column", display_name="Column"))
+		for idx, setting in enumerate(sift_settings):
+			self.addRow({
+				"order": idx,
+				"method": viewitems.TRTEnumViewItem(avbutils.BinSiftMethod(setting.method)),
+				"string": setting.string,
+				"column": setting.column,
+			})
+
 class BinContentsPresenter(presenters.LBItemDefinitionView):
 
 	@QtCore.Slot(object)
@@ -205,6 +243,7 @@ class BinViewLoader(QtCore.QRunnable):
 		sig_got_view_settings = QtCore.Signal(object)
 		sig_got_mob = QtCore.Signal(object)
 		sig_got_sort_settings = QtCore.Signal(object)
+		sig_got_sift_settings = QtCore.Signal(bool, object)
 		sig_done_loading = QtCore.Signal()
 
 	def __init__(self, bin_path:os.PathLike, *args, **kwargs):
@@ -218,6 +257,7 @@ class BinViewLoader(QtCore.QRunnable):
 		with avb.open(self._bin_path) as bin_handle:
 			self._loadBinDisplayOptions(bin_handle)
 			self._loadBinView(bin_handle.content.view_setting)
+			self._loadBinSiftSettings(bin_handle.content.sifted, bin_handle.content.sifted_settings)
 			self._loadBinSorting(bin_handle.content.sort_columns)
 			self._loadCompositionMobs(bin_handle.content.items)
 		
@@ -229,6 +269,9 @@ class BinViewLoader(QtCore.QRunnable):
 	def _loadBinView(self, bin_view:avb.bin.BinViewSetting):
 		bin_view.property_data = avb.core.AVBPropertyData(bin_view.property_data) # Dereference before closing file
 		self._signals.sig_got_view_settings.emit(bin_view)
+	
+	def _loadBinSiftSettings(self, is_sifted:bool, sifted_settings:list[avb.bin.SiftItem]):
+		self._signals.sig_got_sift_settings.emit(is_sifted, sifted_settings)
 	
 	def _loadBinSorting(self, bin_sorting:list):
 		self.signals().sig_got_sort_settings.emit(bin_sorting)
@@ -316,6 +359,7 @@ class MainApplication(QtWidgets.QApplication):
 		self._prop_data_presenter = BinViewPropertyDataPresenter()
 		self._contents_presenter = BinContentsPresenter()
 		self._sorting_presenter = BinSortingPropertiesPresenter()
+		self._sift_presenter = BinSiftSettingsPresenter()
 
 		self._sorting_presenter.sig_bin_sorting_changed.connect(self.sortBinContents)
 
@@ -324,6 +368,11 @@ class MainApplication(QtWidgets.QApplication):
 		self._btn_open.clicked.connect(self.browseForBin)
 
 		self._view_bindisplayoptions = BinDisplayOptionsView()
+
+		self._view_binsiftsettings = BinSiftSettingsView()
+		self._view_binsiftsettings._tree_siftsettings.model().setSourceModel(self._sift_presenter.viewModel())
+		self._sift_presenter.sig_sift_enabled.connect(self._view_binsiftsettings._chk_sift_enabled.setChecked)
+
 				
 		self._tree_column_defs = BinTreeView()
 		self._tree_column_defs.model().setSourceModel(self._col_defs_presenter.viewModel())
@@ -373,8 +422,13 @@ class MainApplication(QtWidgets.QApplication):
 		dock_sortoptions.setFont(dock_font)
 		dock_sortoptions.setWidget(self._tree_sort_properties)
 
+		dock_sift = QtWidgets.QDockWidget("Sift Settings")
+		dock_sift.setFont(dock_font)
+		dock_sift.setWidget(self._view_binsiftsettings)
+
 
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_sortoptions)
+		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_sift)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_propdefs)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_coldefs)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_displayoptions)
@@ -455,6 +509,8 @@ class MainApplication(QtWidgets.QApplication):
 		self._worker.signals().sig_got_view_settings.connect(self._col_defs_presenter.setBinView)
 		self._worker.signals().sig_got_view_settings.connect(self._prop_data_presenter.setBinView)
 		self._worker.signals().sig_got_view_settings.connect(self._contents_presenter.setBinView)
+
+		self._worker.signals().sig_got_sift_settings.connect(self._sift_presenter.setSiftSettings)
 
 		self._worker.signals().sig_got_sort_settings.connect(self._sorting_presenter.setBinSortingProperties)
 
