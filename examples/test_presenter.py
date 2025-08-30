@@ -3,7 +3,7 @@ import avb, avbutils
 from PySide6 import QtCore, QtGui, QtWidgets
 from trt_model import presenters, viewitems, viewmodels, delegates
 
-class BinDisplayOptionsView(QtWidgets.QWidget):
+class BinDisplayItemTypesView(QtWidgets.QWidget):
 
 	sig_option_toggled  = QtCore.Signal(object, bool)
 	sig_options_changed = QtCore.Signal(object)
@@ -16,9 +16,9 @@ class BinDisplayOptionsView(QtWidgets.QWidget):
 		self.layout().setSpacing(0)
 		self.layout().setContentsMargins(0,0,0,0)
 
-		self._option_mappings:dict[avbutils.BinDisplayOptions, QtWidgets.QCheckBox] = dict()
+		self._option_mappings:dict[avbutils.BinDisplayItemTypes, QtWidgets.QCheckBox] = dict()
 
-		for option in avbutils.BinDisplayOptions:
+		for option in avbutils.BinDisplayItemTypes:
 
 			chk_option = QtWidgets.QCheckBox(text=option.name.replace("_"," ").title())
 			chk_option.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
@@ -31,16 +31,16 @@ class BinDisplayOptionsView(QtWidgets.QWidget):
 		print(state)
 	
 	@QtCore.Slot(object)
-	def _optionToggled(self, option:avbutils.BinDisplayOptions):
+	def _optionToggled(self, option:avbutils.BinDisplayItemTypes):
 		print(option)
 	
-	def setOptions(self, options:avbutils.BinDisplayOptions):
-		"""Set all options from a given `avbutils.BinDisplayOptions` enum"""
+	def setOptions(self, options:avbutils.BinDisplayItemTypes):
+		"""Set all options from a given `avbutils.BinDisplayItemTypes` enum"""
 
 		for option in self._option_mappings:
 			self.setOption(option, option in options)
 	
-	def setOption(self, option:avbutils.BinDisplayOptions, is_enabled:bool):
+	def setOption(self, option:avbutils.BinDisplayItemTypes, is_enabled:bool):
 		"""Toggle a single option"""
 
 		if not len(option) == 1:
@@ -255,7 +255,7 @@ class BinViewLoader(QtCore.QRunnable):
 		self._signals.sig_begin_loading.emit()
 
 		with avb.open(self._bin_path) as bin_handle:
-			self._loadBinDisplayOptions(bin_handle)
+			self._loadBinDisplayItemTypes(bin_handle)
 			self._loadBinView(bin_handle.content.view_setting)
 			self._loadBinSiftSettings(bin_handle.content.sifted, bin_handle.content.sifted_settings)
 			self._loadBinSorting(bin_handle.content.sort_columns)
@@ -263,8 +263,8 @@ class BinViewLoader(QtCore.QRunnable):
 		
 		self._signals.sig_done_loading.emit()
 
-	def _loadBinDisplayOptions(self, bin_handle:avb.bin):
-		self._signals.sig_got_display_options.emit(avbutils.BinDisplayOptions.get_options_from_bin(bin_handle.content))
+	def _loadBinDisplayItemTypes(self, bin_handle:avb.bin):
+		self._signals.sig_got_display_options.emit(avbutils.BinDisplayItemTypes.get_options_from_bin(bin_handle.content))
 	
 	def _loadBinView(self, bin_view:avb.bin.BinViewSetting):
 		bin_view.property_data = avb.core.AVBPropertyData(bin_view.property_data) # Dereference before closing file
@@ -285,26 +285,41 @@ class BinViewLoader(QtCore.QRunnable):
 				if not bin_item.user_placed:
 					continue
 				
-				display_options = avbutils.BinDisplayOptions.from_bin_item(bin_item)
+				bin_item_role = avbutils.BinDisplayItemTypes.from_bin_item(bin_item)
 				#print(display_options)
 
 				comp = bin_item.mob
-				if avbutils.composition_is_toplevel(comp):
+
+
+				if avbutils.BinDisplayItemTypes.SEQUENCES in bin_item_role:
 					timecode_range = avbutils.get_timecode_range_for_composition(comp)
 					tape_name = None
 
-				else:
-					try:
-						source_mob = avbutils.matchback_to_sourcemob(comp) if not avbutils.is_sourcemob(comp) else comp
-					except Exception as e:
-						print(source_mob, e)
-						pass
-					tape_name = source_mob.name if source_mob else None
-					try:
-						source_mob_timecode_range = avbutils.get_timecode_range_for_composition(source_mob) if source_mob else None
-						timecode_range = timecode.TimecodeRange(start=source_mob_timecode_range.start, duration=comp.length) if source_mob else None
-					except:
-						timecode_range = timecode.TimecodeRange(start=timecode.Timecode(0, rate=round(comp.edit_rate)), duration=0)
+				elif avbutils.BinDisplayItemTypes.MASTER_CLIPS in bin_item_role:
+
+
+					source_mob = avbutils.matchback_to_sourcemob(comp)
+					#print(source_mob)
+					tape_name = source_mob.name
+					source_mob_timecode_range = avbutils.get_timecode_range_for_composition(source_mob)
+					timecode_range = timecode.TimecodeRange(start=source_mob_timecode_range.start, duration=comp.length)
+
+				elif avbutils.BinDisplayItemTypes.SUBCLIPS in bin_item_role:
+
+					source_clip = avbutils.matchback_to_sourceclip(comp)
+					subclip_offset = (source_clip.start_time)
+					
+					
+					subclip_master = avbutils.matchback_sourceclip(source_clip)
+					#print(subclip_master.start)
+
+					source_mob = avbutils.matchback_to_sourcemob(subclip_master)
+					#print(source_mob)
+
+					tape_name = source_mob.name
+					source_mob_timecode_range = avbutils.get_timecode_range_for_composition(source_mob)
+					timecode_range = timecode.TimecodeRange(start=source_mob_timecode_range.start + subclip_offset, duration=comp.length)
+					#print(timecode_range)
 						
 
 					#timecode_range = None
@@ -323,10 +338,10 @@ class BinViewLoader(QtCore.QRunnable):
 					avbutils.BIN_COLUMN_ROLES["Duration"]: viewitems.TRTDurationViewItem(timecode_range.duration),
 					avbutils.BIN_COLUMN_ROLES["Modified Date"]: comp.last_modified,
 					avbutils.BIN_COLUMN_ROLES["Creation Date"]: comp.creation_time,
-					avbutils.BIN_COLUMN_ROLES[""]: display_options,
+					avbutils.BIN_COLUMN_ROLES[""]: bin_item_role,
 					avbutils.BIN_COLUMN_ROLES["Marker"]: viewitems.TRTMarkerViewItem(markers[0]) if markers else None,
 					avbutils.BIN_COLUMN_ROLES["Tracks"]: avbutils.format_track_labels(list(avbutils.get_tracks_from_composition(comp))),
-					avbutils.BIN_COLUMN_ROLES["Tape"]: tape_name,
+					avbutils.BIN_COLUMN_ROLES["Tape"]: tape_name if tape_name else "",
 					avbutils.BIN_COLUMN_ROLES["Scene"]: comp.attributes.get("_USER",{}).get("Scene"),
 					avbutils.BIN_COLUMN_ROLES["Take"]: comp.attributes.get("_USER",{}).get("Take")
 				}
@@ -367,7 +382,7 @@ class MainApplication(QtWidgets.QApplication):
 		self._btn_open.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.FolderOpen))
 		self._btn_open.clicked.connect(self.browseForBin)
 
-		self._view_bindisplayoptions = BinDisplayOptionsView()
+		self._view_BinDisplayItemTypes = BinDisplayItemTypesView()
 
 		self._view_binsiftsettings = BinSiftSettingsView()
 		self._view_binsiftsettings._tree_siftsettings.model().setSourceModel(self._sift_presenter.viewModel())
@@ -402,7 +417,7 @@ class MainApplication(QtWidgets.QApplication):
 		dock_displayoptions = QtWidgets.QDockWidget("Bin Display Options")
 		dock_displayoptions.setFont(dock_font)
 		dock_displayoptions.setWidget(QtWidgets.QScrollArea())
-		dock_displayoptions.widget().setWidget(self._view_bindisplayoptions)
+		dock_displayoptions.widget().setWidget(self._view_BinDisplayItemTypes)
 
 		dock_propdefs = QtWidgets.QDockWidget("Property Data")
 		dock_propdefs.setFont(dock_font)
@@ -501,7 +516,7 @@ class MainApplication(QtWidgets.QApplication):
 		self._worker.signals().sig_begin_loading.connect(lambda: self._wnd_main.setWindowFilePath(bin_path))
 		self._worker.signals().sig_begin_loading.connect(self._prog_loading.show)
 
-		self._worker.signals().sig_got_display_options.connect(self._view_bindisplayoptions.setOptions)
+		self._worker.signals().sig_got_display_options.connect(self._view_BinDisplayItemTypes.setOptions)
 		
 		self._worker.signals().sig_got_view_settings.connect(lambda binview: self._tree_column_defs.setWindowTitle(f"{binview.name} | Column Definitions"))
 		self._worker.signals().sig_got_view_settings.connect(lambda binview: self._tree_property_data.setWindowTitle(f"{binview.name} | Property Data"))
