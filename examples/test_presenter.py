@@ -294,6 +294,7 @@ class BinViewLoader(QtCore.QRunnable):
 				if avbutils.BinDisplayItemTypes.SEQUENCES in bin_item_role:
 					timecode_range = avbutils.get_timecode_range_for_composition(comp)
 					tape_name = None
+					user_attributes = comp.attributes.get("_USER",{})
 
 				elif avbutils.BinDisplayItemTypes.MASTER_CLIPS in bin_item_role:
 
@@ -303,6 +304,8 @@ class BinViewLoader(QtCore.QRunnable):
 					tape_name = source_mob.name
 					source_mob_timecode_range = avbutils.get_timecode_range_for_composition(source_mob)
 					timecode_range = timecode.TimecodeRange(start=source_mob_timecode_range.start, duration=comp.length)
+
+					user_attributes = comp.attributes.get("_USER",{})
 
 				elif avbutils.BinDisplayItemTypes.SUBCLIPS in bin_item_role:
 
@@ -319,6 +322,9 @@ class BinViewLoader(QtCore.QRunnable):
 					tape_name = source_mob.name
 					source_mob_timecode_range = avbutils.get_timecode_range_for_composition(source_mob)
 					timecode_range = timecode.TimecodeRange(start=source_mob_timecode_range.start + subclip_offset, duration=comp.length)
+
+					#print(comp.attributes.get("_USER",{}))
+					user_attributes = comp.attributes.get("_USER",{})
 					#print(timecode_range)
 						
 
@@ -342,11 +348,11 @@ class BinViewLoader(QtCore.QRunnable):
 					avbutils.BIN_COLUMN_ROLES["Marker"]: viewitems.TRTMarkerViewItem(markers[0]) if markers else None,
 					avbutils.BIN_COLUMN_ROLES["Tracks"]: avbutils.format_track_labels(list(avbutils.get_tracks_from_composition(comp))),
 					avbutils.BIN_COLUMN_ROLES["Tape"]: tape_name if tape_name else "",
-					avbutils.BIN_COLUMN_ROLES["Scene"]: comp.attributes.get("_USER",{}).get("Scene"),
-					avbutils.BIN_COLUMN_ROLES["Take"]: comp.attributes.get("_USER",{}).get("Take")
+					avbutils.BIN_COLUMN_ROLES["Scene"]: user_attributes.get("Scene"),
+					avbutils.BIN_COLUMN_ROLES["Take"]: user_attributes.get("Take")
 				}
 
-				for key, val in comp.attributes.get("_USER","{}").items():
+				for key, val in user_attributes.items():
 					item.update({"40_"+key: val})
 				
 				self._signals.sig_got_mob.emit(item)
