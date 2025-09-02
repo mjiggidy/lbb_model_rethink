@@ -22,8 +22,8 @@ class LBClipColorItemDelegate(QtWidgets.QStyledItemDelegate):
 		# Center, size and shape the canvas QRect
 		canvas = QtCore.QRect(option.rect)
 		canvas.setWidth(canvas.height() * (self._aspect_ratio.width()/self._aspect_ratio.height()))
-		canvas.moveCenter(option.rect.center())
 		canvas = canvas.marginsRemoved(self._margins)
+		canvas.moveCenter(option.rect.center())
 		
 		# Draw border and fill
 		pen = painter.pen()
