@@ -67,6 +67,67 @@ class BinSiftSettingsView(QtWidgets.QWidget):
 		self.layout().addWidget(self._tree_siftsettings)
 
 
+class BinAppearanceSettingsView(QtWidgets.QWidget):
+
+	sig_font_changed = QtCore.Signal(QtGui.QFont)
+	sig_palette_changed = QtCore.Signal(QtGui.QPalette)
+
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+
+		self.setLayout(QtWidgets.QVBoxLayout())
+
+		lay_fonts = QtWidgets.QHBoxLayout()
+		self._cmb_fonts = QtWidgets.QFontComboBox()
+		self._spn_size  = QtWidgets.QSpinBox(minimum=8, maximum=100)	# Avid font dialog extents
+
+		lay_fonts.addWidget(self._cmb_fonts)
+		lay_fonts.addWidget(self._spn_size)
+
+		self.layout().addLayout(lay_fonts)
+
+		lay_colors = QtWidgets.QHBoxLayout()
+		self._btn_fg_color = QtWidgets.QPushButton()
+		self._btn_bg_color = QtWidgets.QPushButton()
+
+		lay_colors.addWidget(self._btn_fg_color)
+		lay_colors.addWidget(self._btn_bg_color)
+
+		self.layout().addLayout(lay_colors)
+
+	@QtCore.Slot(QtGui.QFont)
+	def setBinFont(self, font:QtGui.QFont):
+
+		self._cmb_fonts.setCurrentFont(font)
+		self._spn_size.setValue(font.pixelSize())
+
+	@QtCore.Slot(QtGui.QPalette)
+	def setBinPalette(self, fg_color:QtGui.QColor, bg_color:QtGui.QColor):
+
+		fg = self._btn_fg_color.palette()
+		fg.setColor(QtGui.QPalette.ColorRole.Button, fg_color)
+		
+		bg = self._btn_bg_color.palette()
+		bg.setColor(QtGui.QPalette.ColorRole.Button, bg_color)
+
+		format_color_text = lambda palette: f"R: {palette.red()}  G: {palette.green()}  B: {palette.blue()}"
+
+		self._btn_fg_color.setPalette(fg)
+		self._btn_fg_color.setText(format_color_text(fg.color(QtGui.QPalette.ColorRole.Button)))
+		self._btn_bg_color.setPalette(bg)
+		self._btn_bg_color.setText(format_color_text(bg.color(QtGui.QPalette.ColorRole.Button)))
+	
+	def binFont(self) -> QtGui.QFont:
+		return self._cmb_fonts.currentFont()
+	
+	def binPalette(self) -> tuple[QtGui.QColor, QtGui.QColor]:
+
+		return (
+			self._btn_fg_color.palette().color(QtGui.QPalette.ColorRole.Button),
+			self._btn_bg_color.palette().color(QtGui.QPalette.ColorRole.Button),
+		)
+
+
 class BinTreeView(QtWidgets.QTreeView):
 	"""QTreeView but nicer"""
 
@@ -74,10 +135,13 @@ class BinTreeView(QtWidgets.QTreeView):
 		super().__init__(*args, **kwargs)
 
 		self.setSortingEnabled(True)
-		self.setIndentation(0)
+		#self.setIndentation(0)
+		self.setRootIsDecorated(False)
 		self.setAlternatingRowColors(True)
 		self.setUniformRowHeights(True)
 		#self.setSelectionBehavior(self.SelectionBehavior.SelectRows)
+
+		self.header().setFirstSectionMovable(True)
 		
 		self.setModel((viewmodels.TRTSortFilterProxyModel()))
 		#self.model().setSortRole(QtCore.Qt.ItemDataRole.InitialSortOrderRole)
@@ -107,8 +171,11 @@ class BinTreeView(QtWidgets.QTreeView):
 
 		self.sortByColumn(header_index, sort_order)
 		return True
-	
-	
+
+	def sizeHintForColumn(self, column):
+		return super().sizeHintForColumn(column) + 24
+
+
 
 
 class BinViewColumDefinitionsPresenter(presenters.LBItemDefinitionView):
@@ -160,6 +227,25 @@ class BinViewPropertyDataPresenter(presenters.LBItemDefinitionView):
 		for key,val in bin_view.property_data.items():
 			self.addRow({"name": key, "value": val})
 
+class BinAppearanceSettingsPresenter(QtCore.QObject):
+
+	sig_font_changed    = QtCore.Signal(QtGui.QFont)
+	sig_palette_changed = QtCore.Signal(QtGui.QColor, QtGui.QColor)
+
+	@QtCore.Slot(int, int, list, list)
+	def setAppearanceSettings(self, mac_font:int, mac_font_size:int, foreground_color:list[int], background_color:list[int]):
+
+		font = QtGui.QFont()
+		font.setFamily(QtGui.QFontDatabase.families()[mac_font])
+		font.setPixelSize(mac_font_size)
+
+		self.sig_font_changed.emit(font)
+		
+		self.sig_palette_changed.emit(
+			QtGui.QColor.fromRgba64(*foreground_color),
+			QtGui.QColor.fromRgba64(*background_color),
+		)
+
 class BinSortingPropertiesPresenter(presenters.LBItemDefinitionView):
 	"""Bin sorting"""
 
@@ -191,7 +277,6 @@ class BinSortingPropertiesPresenter(presenters.LBItemDefinitionView):
 class BinSiftSettingsPresenter(presenters.LBItemDefinitionView):
 
 	sig_sift_enabled = QtCore.Signal(bool)
-	sig_sift_settings = QtCore.Signal(list)
 
 	@QtCore.Slot(bool, object)
 	def setSiftSettings(self, sift_enabled:bool, sift_settings:list[avb.bin.SiftItem]):
@@ -239,6 +324,7 @@ class BinViewLoader(QtCore.QRunnable):
 	class Signals(QtCore.QObject):
 
 		sig_begin_loading = QtCore.Signal()
+		sig_got_bin_appearance_settings = QtCore.Signal(object, object, object, object)
 		sig_got_display_options = QtCore.Signal(object)
 		sig_got_view_settings = QtCore.Signal(object)
 		sig_got_mob = QtCore.Signal(object)
@@ -255,7 +341,9 @@ class BinViewLoader(QtCore.QRunnable):
 		self._signals.sig_begin_loading.emit()
 
 		with avb.open(self._bin_path) as bin_handle:
+			
 			self._loadBinDisplayItemTypes(bin_handle)
+			self._loadBinAppearanceSettings(bin_handle.content)
 			self._loadBinView(bin_handle.content.view_setting)
 			self._loadBinSiftSettings(bin_handle.content.sifted, bin_handle.content.sifted_settings)
 			self._loadBinSorting(bin_handle.content.sort_columns)
@@ -263,7 +351,11 @@ class BinViewLoader(QtCore.QRunnable):
 		
 		self._signals.sig_done_loading.emit()
 
-	def _loadBinDisplayItemTypes(self, bin_handle:avb.bin):
+	def _loadBinAppearanceSettings(self, bin_content:avb.bin.Bin):
+		self.signals().sig_got_bin_appearance_settings.emit(bin_content.mac_font, bin_content.mac_font_size, bin_content.forground_color, bin_content.background_color)
+		
+
+	def _loadBinDisplayItemTypes(self, bin_handle:avb.bin.Bin):
 		self._signals.sig_got_display_options.emit(avbutils.BinDisplayItemTypes.get_options_from_bin(bin_handle.content))
 	
 	def _loadBinView(self, bin_view:avb.bin.BinViewSetting):
@@ -381,6 +473,7 @@ class MainApplication(QtWidgets.QApplication):
 		self._contents_presenter = BinContentsPresenter()
 		self._sorting_presenter = BinSortingPropertiesPresenter()
 		self._sift_presenter = BinSiftSettingsPresenter()
+		self._appearance_presenter = BinAppearanceSettingsPresenter()
 
 		self._sorting_presenter.sig_bin_sorting_changed.connect(self.sortBinContents)
 
@@ -389,6 +482,10 @@ class MainApplication(QtWidgets.QApplication):
 		self._btn_open.clicked.connect(self.browseForBin)
 
 		self._view_BinDisplayItemTypes = BinDisplayItemTypesView()
+		
+		self._view_BinAppearanceSettings = BinAppearanceSettingsView()
+		self._appearance_presenter.sig_font_changed.connect(self._view_BinAppearanceSettings.setBinFont)
+		self._appearance_presenter.sig_palette_changed.connect(self._view_BinAppearanceSettings.setBinPalette)
 
 		self._view_binsiftsettings = BinSiftSettingsView()
 		self._view_binsiftsettings._tree_siftsettings.model().setSourceModel(self._sift_presenter.viewModel())
@@ -408,7 +505,8 @@ class MainApplication(QtWidgets.QApplication):
 		#self._tree_bin_contents.setFont(font)
 		self._tree_bin_contents.model().setSourceModel(self._contents_presenter.viewModel())
 		self._tree_bin_contents.setItemDelegateForColumn(0, delegates.LBClipColorItemDelegate())
-
+		self._appearance_presenter.sig_font_changed.connect(self._tree_bin_contents.setFont)
+		
 		self._tree_sort_properties = BinTreeView()
 		self._tree_sort_properties.model().setSourceModel(self._sorting_presenter.viewModel())
 
@@ -420,15 +518,18 @@ class MainApplication(QtWidgets.QApplication):
 		dock_font = QtWidgets.QDockWidget().font()
 		dock_font.setPointSizeF(dock_font.pointSizeF() * 0.8)
 
-		dock_displayoptions = QtWidgets.QDockWidget("Bin Display Options")
+		dock_displayoptions = QtWidgets.QDockWidget("Bin Display Settings")
 		dock_displayoptions.setFont(dock_font)
 		dock_displayoptions.setWidget(QtWidgets.QScrollArea())
 		dock_displayoptions.widget().setWidget(self._view_BinDisplayItemTypes)
 
+		dock_appearance = QtWidgets.QDockWidget("Bin Appearance Settings")
+		dock_appearance.setFont(dock_font)
+		dock_appearance.setWidget(self._view_BinAppearanceSettings)
+
 		dock_propdefs = QtWidgets.QDockWidget("Property Data")
 		dock_propdefs.setFont(dock_font)
 		dock_propdefs.setWidget(self._tree_property_data)
-
 
 		dock_coldefs = QtWidgets.QDockWidget("Column Definitions")
 		dock_coldefs.setFont(dock_font)
@@ -453,6 +554,7 @@ class MainApplication(QtWidgets.QApplication):
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_propdefs)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_coldefs)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_displayoptions)
+		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_appearance)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_btn_open)
 
 		self._wnd_main.show()
@@ -523,6 +625,8 @@ class MainApplication(QtWidgets.QApplication):
 		self._worker.signals().sig_begin_loading.connect(self._prog_loading.show)
 
 		self._worker.signals().sig_got_display_options.connect(self._view_BinDisplayItemTypes.setOptions)
+
+		self._worker.signals().sig_got_bin_appearance_settings.connect(self._appearance_presenter.setAppearanceSettings)
 		
 		self._worker.signals().sig_got_view_settings.connect(lambda binview: self._tree_column_defs.setWindowTitle(f"{binview.name} | Column Definitions"))
 		self._worker.signals().sig_got_view_settings.connect(lambda binview: self._tree_property_data.setWindowTitle(f"{binview.name} | Property Data"))
