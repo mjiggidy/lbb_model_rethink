@@ -95,6 +95,9 @@ class BinAppearanceSettingsView(QtWidgets.QWidget):
 
 		self.layout().addLayout(lay_colors)
 
+		self._cmb_fonts.currentFontChanged.connect(self.sig_font_changed)
+		self._spn_size.valueChanged.connect(lambda: self.sig_font_changed.emit(self.binFont()))
+
 	@QtCore.Slot(QtGui.QFont)
 	def setBinFont(self, font:QtGui.QFont):
 
@@ -118,7 +121,9 @@ class BinAppearanceSettingsView(QtWidgets.QWidget):
 		self._btn_bg_color.setText(format_color_text(bg.color(QtGui.QPalette.ColorRole.Button)))
 	
 	def binFont(self) -> QtGui.QFont:
-		return self._cmb_fonts.currentFont()
+		font = self._cmb_fonts.currentFont()
+		font.setPixelSize(self._spn_size.value())
+		return font
 	
 	def binPalette(self) -> tuple[QtGui.QColor, QtGui.QColor]:
 
@@ -486,6 +491,8 @@ class MainApplication(QtWidgets.QApplication):
 		self._view_BinAppearanceSettings = BinAppearanceSettingsView()
 		self._appearance_presenter.sig_font_changed.connect(self._view_BinAppearanceSettings.setBinFont)
 		self._appearance_presenter.sig_palette_changed.connect(self._view_BinAppearanceSettings.setBinPalette)
+		self._view_BinAppearanceSettings.sig_font_changed.connect(self._appearance_presenter.sig_font_changed)
+		# Incomplete
 
 		self._view_binsiftsettings = BinSiftSettingsView()
 		self._view_binsiftsettings._tree_siftsettings.model().setSourceModel(self._sift_presenter.viewModel())
@@ -506,6 +513,7 @@ class MainApplication(QtWidgets.QApplication):
 		self._tree_bin_contents.model().setSourceModel(self._contents_presenter.viewModel())
 		self._tree_bin_contents.setItemDelegateForColumn(0, delegates.LBClipColorItemDelegate())
 		self._appearance_presenter.sig_font_changed.connect(self._tree_bin_contents.setFont)
+		self._appearance_presenter.sig_palette_changed.connect(self._set_tree_palette)
 		
 		self._tree_sort_properties = BinTreeView()
 		self._tree_sort_properties.model().setSourceModel(self._sorting_presenter.viewModel())
@@ -559,6 +567,20 @@ class MainApplication(QtWidgets.QApplication):
 
 		self._wnd_main.show()
 	
+	@QtCore.Slot(QtGui.QColor, QtGui.QColor)
+	def _set_tree_palette(self, fg:QtGui.QColor, bg:QtGui.QColor):
+
+		palette = self._tree_bin_contents.palette()
+
+		palette.setColor(QtGui.QPalette.ColorRole.Text, fg)
+		palette.setColor(QtGui.QPalette.ColorRole.ButtonText, fg)
+		palette.setColor(QtGui.QPalette.ColorRole.Base, bg)
+		palette.setColor(QtGui.QPalette.ColorRole.Button, bg)
+		palette.setColor(QtGui.QPalette.ColorRole.AlternateBase, bg.darker(125))
+
+		self._tree_bin_contents.setPalette(palette)
+		#self._tree_bin_contents.header().setPalette(palette)
+
 	@QtCore.Slot(QtCore.QModelIndex)
 	def focusBinColumn(self, index:QtCore.QModelIndex):
 
