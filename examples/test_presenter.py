@@ -98,27 +98,69 @@ class BinAppearanceSettingsView(QtWidgets.QWidget):
 		self._cmb_fonts.currentFontChanged.connect(self.sig_font_changed)
 		self._spn_size.valueChanged.connect(lambda: self.sig_font_changed.emit(self.binFont()))
 
+		self._btn_fg_color.clicked.connect(self.fgColorPickerRequested)
+		self._btn_bg_color.clicked.connect(self.bgColorPickerRequested)
+
+
+	# TODO I'm sure this can be one method
+	@QtCore.Slot()
+	def bgColorPickerRequested(self):
+		
+		bg_color,_ = self.binPalette()
+		new_color = QtWidgets.QColorDialog.getColor(bg_color, self._btn_fg_color, "Choose a text color")
+		
+		if new_color.isValid():
+			self.setBinBackgroundColor(new_color)
+
+	@QtCore.Slot()
+	def fgColorPickerRequested(self):
+		
+		fg_color,_ = self.binPalette()
+		new_color = QtWidgets.QColorDialog.getColor(fg_color, self._btn_fg_color, "Choose a text color")
+
+		if new_color.isValid():
+			self.setBinForegroundColor(new_color)
+
 	@QtCore.Slot(QtGui.QFont)
 	def setBinFont(self, font:QtGui.QFont):
 
 		self._cmb_fonts.setCurrentFont(font)
 		self._spn_size.setValue(font.pixelSize())
 
+	@QtCore.Slot(QtGui.QColor)
+	def setBinForegroundColor(self, color:QtGui.QColor):
+		
+		fg = self._btn_fg_color.palette()
+		fg.setColor(QtGui.QPalette.ColorRole.Button, color)
+		
+		self._btn_fg_color.setPalette(fg)
+		self._btn_fg_color.setText(self._format_color_text(fg.color(QtGui.QPalette.ColorRole.Button)))
+		self.sig_palette_changed.emit(self.binPalette())
+
+	@QtCore.Slot(QtGui.QColor)
+	def setBinBackgroundColor(self, color:QtGui.QColor):
+		
+		bg = self._btn_bg_color.palette()
+		bg.setColor(QtGui.QPalette.ColorRole.Button, color)
+		
+		self._btn_bg_color.setPalette(bg)
+		self._btn_bg_color.setText(self._format_color_text(bg.color(QtGui.QPalette.ColorRole.Button)))
+
+		self.sig_palette_changed.emit(self.binPalette())
+
+	
+	@staticmethod
+	def _format_color_text(color:QtGui.QColor) -> str:
+		return f"R: {color.red()}  G: {color.green()}  B: {color.blue()}"
+
 	@QtCore.Slot(QtGui.QPalette)
 	def setBinPalette(self, fg_color:QtGui.QColor, bg_color:QtGui.QColor):
 
-		fg = self._btn_fg_color.palette()
-		fg.setColor(QtGui.QPalette.ColorRole.Button, fg_color)
-		
-		bg = self._btn_bg_color.palette()
-		bg.setColor(QtGui.QPalette.ColorRole.Button, bg_color)
-
-		format_color_text = lambda palette: f"R: {palette.red()}  G: {palette.green()}  B: {palette.blue()}"
-
-		self._btn_fg_color.setPalette(fg)
-		self._btn_fg_color.setText(format_color_text(fg.color(QtGui.QPalette.ColorRole.Button)))
-		self._btn_bg_color.setPalette(bg)
-		self._btn_bg_color.setText(format_color_text(bg.color(QtGui.QPalette.ColorRole.Button)))
+		self.blockSignals(True)
+		self.setBinForegroundColor(fg_color)
+		self.setBinBackgroundColor(bg_color)
+		self.blockSignals(False)
+		self.sig_palette_changed.emit(self.binPalette())
 	
 	def binFont(self) -> QtGui.QFont:
 		font = self._cmb_fonts.currentFont()
@@ -126,6 +168,7 @@ class BinAppearanceSettingsView(QtWidgets.QWidget):
 		return font
 	
 	def binPalette(self) -> tuple[QtGui.QColor, QtGui.QColor]:
+		"""Returns a tuple of `(fg_color:QtGui.QColor, bg_color:QtGui.QColor)`.  Weird notation lol"""
 
 		return (
 			self._btn_fg_color.palette().color(QtGui.QPalette.ColorRole.Button),
@@ -241,7 +284,9 @@ class BinAppearanceSettingsPresenter(QtCore.QObject):
 	def setAppearanceSettings(self, mac_font:int, mac_font_size:int, foreground_color:list[int], background_color:list[int]):
 
 		font = QtGui.QFont()
-		font.setFamily(QtGui.QFontDatabase.families()[mac_font])
+		font_families = QtGui.QFontDatabase.families()
+		if len(font_families) > mac_font:
+			font.setFamily(font_families[mac_font])
 		font.setPixelSize(mac_font_size)
 
 		self.sig_font_changed.emit(font)
@@ -492,6 +537,7 @@ class MainApplication(QtWidgets.QApplication):
 		self._appearance_presenter.sig_font_changed.connect(self._view_BinAppearanceSettings.setBinFont)
 		self._appearance_presenter.sig_palette_changed.connect(self._view_BinAppearanceSettings.setBinPalette)
 		self._view_BinAppearanceSettings.sig_font_changed.connect(self._appearance_presenter.sig_font_changed)
+		#self._view_BinAppearanceSettings.sig_palette_changed.connect(self._appearance_presenter.sig)
 		# Incomplete
 
 		self._view_binsiftsettings = BinSiftSettingsView()
@@ -575,7 +621,7 @@ class MainApplication(QtWidgets.QApplication):
 		palette.setColor(QtGui.QPalette.ColorRole.Text, fg)
 		palette.setColor(QtGui.QPalette.ColorRole.ButtonText, fg)
 		palette.setColor(QtGui.QPalette.ColorRole.Base, bg)
-		palette.setColor(QtGui.QPalette.ColorRole.Button, bg)
+		palette.setColor(QtGui.QPalette.ColorRole.Button, bg.darker(125))
 		palette.setColor(QtGui.QPalette.ColorRole.AlternateBase, bg.darker(125))
 
 		self._tree_bin_contents.setPalette(palette)
