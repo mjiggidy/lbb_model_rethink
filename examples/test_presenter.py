@@ -181,36 +181,54 @@ class BinTreeView(QtWidgets.QTreeView):
 
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
+		
+		self.setModel((viewmodels.TRTSortFilterProxyModel()))
 
 		self.setSortingEnabled(True)
-		#self.setIndentation(0)
 		self.setRootIsDecorated(False)
 		self.setAlternatingRowColors(True)
 		self.setUniformRowHeights(True)
-		#self.setSelectionBehavior(self.SelectionBehavior.SelectRows)
 
 		self.header().setFirstSectionMovable(True)
-		
-		self.setModel((viewmodels.TRTSortFilterProxyModel()))
-		#self.model().setSortRole(QtCore.Qt.ItemDataRole.InitialSortOrderRole)
-	
-	@QtCore.Slot()
-	def resizeAllColumnsToContents(self):
-		for idx in range(self.header().count()):
-			self.resizeColumnToContents(idx)
-	
-	@QtCore.Slot(str, QtCore.Qt.SortOrder)
-	def sortByColumnName(self, column_name:str, sort_order:QtCore.Qt.SortOrder) -> bool:
-		"""Sort by a column's display name"""
+		self.header().setDefaultAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
 
-		# Get all column names
-		column_names = [
+	def columnDisplayNames(self) -> list[str]:
+		"""Get all column display names, in order"""
+		print(self.model().columnCount())
+		return [
 			self.model().headerData(idx,
 				QtCore.Qt.Orientation.Horizontal,
 				QtCore.Qt.ItemDataRole.DisplayRole
 			)
 			for idx in range(self.header().count())
 		]
+	
+	@QtCore.Slot()
+	def resizeAllColumnsToContents(self):
+		for idx in range(self.header().count()):
+			self.resizeColumnToContents(idx)
+
+	@QtCore.Slot(object)
+	def setColumnWidths(self, column_widths:dict[str,int]):
+
+		if not column_widths:
+			self.resizeAllColumnsToContents()
+			print("No")
+			return
+		column_names = self.columnDisplayNames()
+
+		for col, width in column_widths.items():
+			try:
+				col_idx = column_names.index(col)
+			except ValueError:
+				continue
+			self.setColumnWidth(col_idx, width)
+	
+	@QtCore.Slot(str, QtCore.Qt.SortOrder)
+	def sortByColumnName(self, column_name:str, sort_order:QtCore.Qt.SortOrder) -> bool:
+		"""Sort by a column's display name"""
+
+		column_names = self.columnDisplayNames()
 
 		try:
 			header_index = column_names.index(column_name)
@@ -254,7 +272,6 @@ class BinViewColumDefinitionsPresenter(presenters.LBItemDefinitionView):
 	def addColumnDefinition(self, column_definition:dict[str,object]):
 
 		column_definition["format"] = avbutils.BinColumnFormat(column_definition["format"])
-
 		self.addRow(column_definition)
 
 class BinViewPropertyDataPresenter(presenters.LBItemDefinitionView):
@@ -277,11 +294,17 @@ class BinViewPropertyDataPresenter(presenters.LBItemDefinitionView):
 
 class BinAppearanceSettingsPresenter(QtCore.QObject):
 
-	sig_font_changed    = QtCore.Signal(QtGui.QFont)
-	sig_palette_changed = QtCore.Signal(QtGui.QColor, QtGui.QColor)
+	sig_font_changed          = QtCore.Signal(QtGui.QFont)
+	sig_palette_changed       = QtCore.Signal(QtGui.QColor, QtGui.QColor)
+	sig_column_widths_changed = QtCore.Signal(object)
 
 	@QtCore.Slot(int, int, list, list)
-	def setAppearanceSettings(self, bin_font:str|int, mac_font_size:int, foreground_color:list[int], background_color:list[int]):
+	def setAppearanceSettings(self,
+		bin_font:str|int,
+		mac_font_size:int,
+		foreground_color:list[int],
+		background_color:list[int],
+		column_widths:dict[str,int]):
 
 		font = QtGui.QFont()
 
@@ -291,19 +314,15 @@ class BinAppearanceSettingsPresenter(QtCore.QObject):
 		elif isinstance(bin_font, int) and len(QtGui.QFontDatabase.families()) > bin_font:
 			font.setFamily(QtGui.QFontDatabase.families()[bin_font])
 		
-		#font.setStyle(QtGui.QFont.Style.StyleNormal)
-		#font.setWeight(QtGui.QFont.Weight.Normal)
-		#font.setStretch(QtGui.QFont.Stretch.Unstretched)
-		#font.set
-		print(font)
 		font.setPixelSize(mac_font_size)
 
+		self.sig_column_widths_changed.emit(column_widths)
 		self.sig_font_changed.emit(font)
-		
 		self.sig_palette_changed.emit(
 			QtGui.QColor.fromRgba64(*foreground_color),
 			QtGui.QColor.fromRgba64(*background_color),
 		)
+		
 
 class BinSortingPropertiesPresenter(presenters.LBItemDefinitionView):
 	"""Bin sorting"""
@@ -383,7 +402,7 @@ class BinViewLoader(QtCore.QRunnable):
 	class Signals(QtCore.QObject):
 
 		sig_begin_loading = QtCore.Signal()
-		sig_got_bin_appearance_settings = QtCore.Signal(object, object, object, object)
+		sig_got_bin_appearance_settings = QtCore.Signal(object, object, object, object, object)
 		sig_got_display_options = QtCore.Signal(object)
 		sig_got_view_settings = QtCore.Signal(object)
 		sig_got_mob = QtCore.Signal(object)
@@ -401,11 +420,11 @@ class BinViewLoader(QtCore.QRunnable):
 
 		with avb.open(self._bin_path) as bin_handle:
 			
-			self._loadBinDisplayItemTypes(bin_handle)
-			self._loadBinAppearanceSettings(bin_handle.content)
-			self._loadBinView(bin_handle.content.view_setting)
+			self._loadBinDisplayItemTypes(bin_handle.content)
+			self._loadBinView(bin_handle.content)
 			self._loadBinSiftSettings(bin_handle.content.sifted, bin_handle.content.sifted_settings)
 			self._loadBinSorting(bin_handle.content.sort_columns)
+			self._loadBinAppearanceSettings(bin_handle.content)
 			self._loadCompositionMobs(bin_handle.content.items)
 		
 		self._signals.sig_done_loading.emit()
@@ -415,14 +434,29 @@ class BinViewLoader(QtCore.QRunnable):
 			bin_font = bin_content.attributes["ATTR__BIN_FONT_NAME"]
 		else:
 			bin_font = bin_content.mac_font
-		self.signals().sig_got_bin_appearance_settings.emit(bin_font, bin_content.mac_font_size, bin_content.forground_color, bin_content.background_color)
-		
 
-	def _loadBinDisplayItemTypes(self, bin_handle:avb.bin.Bin):
-		self._signals.sig_got_display_options.emit(avbutils.BinDisplayItemTypes.get_options_from_bin(bin_handle.content))
+		# Try to load bin column widths from the "BIN_COLUMNS_WIDTHS" bytearray, which decodes to JSON
+		try:
+			import json
+			bin_column_widths = json.loads(bin_content.attributes.get("BIN_COLUMNS_WIDTHS",{}).decode("utf-8"))
+		except:
+			bin_column_widths = {}
+
+		self.signals().sig_got_bin_appearance_settings.emit(
+			bin_font,
+			bin_content.mac_font_size,
+			bin_content.forground_color,
+			bin_content.background_color,
+			bin_column_widths)
+		
+	def _loadBinDisplayItemTypes(self, bin_content:avb.bin.Bin):
+		self._signals.sig_got_display_options.emit(avbutils.BinDisplayItemTypes.get_options_from_bin(bin_content))
 	
-	def _loadBinView(self, bin_view:avb.bin.BinViewSetting):
+	def _loadBinView(self, bin_content:avb.bin.Bin):
+		
+		bin_view = bin_content.view_setting
 		bin_view.property_data = avb.core.AVBPropertyData(bin_view.property_data) # Dereference before closing file
+		
 		self._signals.sig_got_view_settings.emit(bin_view)
 	
 	def _loadBinSiftSettings(self, is_sifted:bool, sifted_settings:list[avb.bin.SiftItem]):
@@ -566,13 +600,11 @@ class MainApplication(QtWidgets.QApplication):
 		self._tree_property_data.model().setSourceModel(self._prop_data_presenter.viewModel())
 
 		self._tree_bin_contents = BinTreeView()
-		#font = self._tree_bin_contents.font()
-		#font.setPointSizeF(font.pointSizeF() * 0.95)
-		#self._tree_bin_contents.setFont(font)
 		self._tree_bin_contents.model().setSourceModel(self._contents_presenter.viewModel())
 		self._tree_bin_contents.setItemDelegateForColumn(0, delegates.LBClipColorItemDelegate())
 		self._appearance_presenter.sig_font_changed.connect(self._tree_bin_contents.setFont)
 		self._appearance_presenter.sig_palette_changed.connect(self._set_tree_palette)
+		self._appearance_presenter.sig_column_widths_changed.connect(self._tree_bin_contents.setColumnWidths)
 		
 		self._tree_sort_properties = BinTreeView()
 		self._tree_sort_properties.model().setSourceModel(self._sorting_presenter.viewModel())
@@ -677,8 +709,7 @@ class MainApplication(QtWidgets.QApplication):
 
 		selected = selected[0] if selected else self._tree_bin_contents.model().index(0, 0, QtCore.QModelIndex())
 		
-		self._tree_bin_contents.scrollTo(selected.siblingAtColumn(idx_tree_name), self._tree_bin_contents.ScrollHint.EnsureVisible)
-		
+		self._tree_bin_contents.scrollTo(selected.siblingAtColumn(idx_tree_name), self._tree_bin_contents.ScrollHint.PositionAtCenter)
 
 
 	
@@ -722,7 +753,7 @@ class MainApplication(QtWidgets.QApplication):
 
 		self._worker.signals().sig_got_mob.connect(self._contents_presenter.addMob)
 
-		self._worker.signals().sig_done_loading.connect(self._tree_bin_contents.resizeAllColumnsToContents)
+		#self._worker.signals().sig_done_loading.connect(self._tree_bin_contents.resizeAllColumnsToContents)
 		self._worker.signals().sig_done_loading.connect(self._tree_column_defs.resizeAllColumnsToContents)
 		self._worker.signals().sig_done_loading.connect(self._tree_property_data.resizeAllColumnsToContents)
 		self._worker.signals().sig_done_loading.connect(self._tree_sort_properties.resizeAllColumnsToContents)
