@@ -281,12 +281,21 @@ class BinAppearanceSettingsPresenter(QtCore.QObject):
 	sig_palette_changed = QtCore.Signal(QtGui.QColor, QtGui.QColor)
 
 	@QtCore.Slot(int, int, list, list)
-	def setAppearanceSettings(self, mac_font:int, mac_font_size:int, foreground_color:list[int], background_color:list[int]):
+	def setAppearanceSettings(self, bin_font:str|int, mac_font_size:int, foreground_color:list[int], background_color:list[int]):
 
 		font = QtGui.QFont()
-		font_families = QtGui.QFontDatabase.families()
-		if len(font_families) > mac_font:
-			font.setFamily(font_families[mac_font])
+
+		if isinstance(bin_font, str) and QtGui.QFontDatabase.hasFamily(bin_font):
+			font.setFamily(bin_font)
+
+		elif isinstance(bin_font, int) and len(QtGui.QFontDatabase.families()) > bin_font:
+			font.setFamily(QtGui.QFontDatabase.families()[bin_font])
+		
+		#font.setStyle(QtGui.QFont.Style.StyleNormal)
+		#font.setWeight(QtGui.QFont.Weight.Normal)
+		#font.setStretch(QtGui.QFont.Stretch.Unstretched)
+		#font.set
+		print(font)
 		font.setPixelSize(mac_font_size)
 
 		self.sig_font_changed.emit(font)
@@ -402,7 +411,11 @@ class BinViewLoader(QtCore.QRunnable):
 		self._signals.sig_done_loading.emit()
 
 	def _loadBinAppearanceSettings(self, bin_content:avb.bin.Bin):
-		self.signals().sig_got_bin_appearance_settings.emit(bin_content.mac_font, bin_content.mac_font_size, bin_content.forground_color, bin_content.background_color)
+		if "attributes" in bin_content.property_data and "ATTR__BIN_FONT_NAME" in bin_content.attributes:
+			bin_font = bin_content.attributes["ATTR__BIN_FONT_NAME"]
+		else:
+			bin_font = bin_content.mac_font
+		self.signals().sig_got_bin_appearance_settings.emit(bin_font, bin_content.mac_font_size, bin_content.forground_color, bin_content.background_color)
 		
 
 	def _loadBinDisplayItemTypes(self, bin_handle:avb.bin.Bin):
