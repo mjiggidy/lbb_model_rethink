@@ -77,10 +77,51 @@ class BinAppearanceSettingsView(QtWidgets.QWidget):
 
 		self.setLayout(QtWidgets.QVBoxLayout())
 
+		self._spn_geo_x = QtWidgets.QSpinBox()
+		self._spn_geo_x.setSuffix(" px")
+		self._spn_geo_x.setMaximum(9999)
+		self._spn_geo_x.setMinimum(-9999)
+		self._spn_geo_x.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
+		self._spn_geo_y = QtWidgets.QSpinBox()
+		self._spn_geo_y.setSuffix(" px")
+		self._spn_geo_y.setMaximum(9999)
+		self._spn_geo_y.setMinimum(-9999)
+		self._spn_geo_y.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
+
+		self._spn_geo_w = QtWidgets.QSpinBox()
+		self._spn_geo_w.setSuffix(" px")
+		self._spn_geo_w.setMaximum(9999)
+		self._spn_geo_w.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
+		#self._spn_geo_w.setMinimum(-9999)
+		self._spn_geo_h = QtWidgets.QSpinBox()
+		self._spn_geo_h.setSuffix(" px")
+		self._spn_geo_h.setMaximum(9999)
+		self._spn_geo_h.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
+		#self._spn_geo_h.setMinimum(-9999)
+
+		self.layout().addWidget(QtWidgets.QLabel("Window Geometry"))
+		
+		lay_geo= QtWidgets.QGridLayout()
+		lay_geo.addWidget(QtWidgets.QLabel("X:"), 0, 0, QtCore.Qt.AlignmentFlag.AlignRight)
+		lay_geo.addWidget(self._spn_geo_x, 0, 1)
+		lay_geo.addWidget(QtWidgets.QLabel("Y:"), 1, 0, QtCore.Qt.AlignmentFlag.AlignRight)
+		lay_geo.addWidget(self._spn_geo_y, 1, 1)
+		
+		lay_geo.setColumnStretch(2, 1)
+		
+		lay_geo.addWidget(QtWidgets.QLabel("W:"), 0, 3, QtCore.Qt.AlignmentFlag.AlignRight)
+		lay_geo.addWidget(self._spn_geo_w, 0, 4)
+		lay_geo.addWidget(QtWidgets.QLabel("H:"), 1, 3, QtCore.Qt.AlignmentFlag.AlignRight)
+		lay_geo.addWidget(self._spn_geo_h, 1, 4)
+		#lay_geo_dimensions.addStretch()
+
+		self.layout().addLayout(lay_geo)
+
 		lay_fonts = QtWidgets.QHBoxLayout()
 		self._cmb_fonts = QtWidgets.QFontComboBox()
 		self._spn_size  = QtWidgets.QSpinBox(minimum=8, maximum=100)	# Avid font dialog extents
 
+		self.layout().addWidget(QtWidgets.QLabel("Font And Colors"))
 		lay_fonts.addWidget(self._cmb_fonts)
 		lay_fonts.addWidget(self._spn_size)
 
@@ -99,7 +140,7 @@ class BinAppearanceSettingsView(QtWidgets.QWidget):
 		self.layout().addWidget(QtWidgets.QLabel("Column Widths"))
 		self.layout().addWidget(self._tree_column_widths)
 
-		self.layout().addStretch()
+		
 
 		self._cmb_fonts.currentFontChanged.connect(self.sig_font_changed)
 		self._spn_size.valueChanged.connect(lambda: self.sig_font_changed.emit(self.binFont()))
@@ -126,6 +167,15 @@ class BinAppearanceSettingsView(QtWidgets.QWidget):
 
 		if new_color.isValid():
 			self.setBinForegroundColor(new_color)
+	
+	@QtCore.Slot(QtCore.QRect)
+	def setBinRect(self, rect:QtCore.QRect):
+		print(rect)
+		
+		self._spn_geo_x.setValue(rect.x())
+		self._spn_geo_y.setValue(rect.y())
+		self._spn_geo_w.setValue(rect.width())
+		self._spn_geo_h.setValue(rect.height())
 
 	@QtCore.Slot(QtGui.QFont)
 	def setBinFont(self, font:QtGui.QFont):
@@ -301,15 +351,17 @@ class BinAppearanceSettingsPresenter(presenters.LBItemDefinitionView):
 	sig_font_changed          = QtCore.Signal(QtGui.QFont)
 	sig_palette_changed       = QtCore.Signal(QtGui.QColor, QtGui.QColor)
 	sig_column_widths_changed = QtCore.Signal(object)
+	sig_window_rect_changed   = QtCore.Signal(object)
 
-	@QtCore.Slot(int, int, list, list)
+	@QtCore.Slot(object, object, object, object, object, object)
 	def setAppearanceSettings(self,
 		bin_font:str|int,
 		mac_font_size:int,
 		foreground_color:list[int],
 		background_color:list[int],
-		column_widths:dict[str,int]):
-
+		column_widths:dict[str,int],
+		window_rect:list[int]):
+		
 		font = QtGui.QFont()
 
 		if isinstance(bin_font, str) and QtGui.QFontDatabase.hasFamily(bin_font):
@@ -320,16 +372,27 @@ class BinAppearanceSettingsPresenter(presenters.LBItemDefinitionView):
 		
 		font.setPixelSize(mac_font_size)
 
-		self.updateColumnWidths(column_widths)
+		self.setColumnWidths(column_widths)
+		self.setWindowRect(window_rect)
 		self.sig_column_widths_changed.emit(column_widths)
 		self.sig_font_changed.emit(font)
 		self.sig_palette_changed.emit(
 			QtGui.QColor.fromRgba64(*foreground_color),
 			QtGui.QColor.fromRgba64(*background_color),
 		)
+
+
+	@QtCore.Slot(object)
+	def setWindowRect(self, window_rect:list[int]):
+
+		self.sig_window_rect_changed.emit(QtCore.QRect(
+			QtCore.QPoint(*window_rect[:2]),
+			QtCore.QPoint(*window_rect[2:])
+		))
+
 	
 	@QtCore.Slot(object)
-	def updateColumnWidths(self, column_widths:dict[str,int]):
+	def setColumnWidths(self, column_widths:dict[str,int]):
 		"""Display column width settings"""
 
 		self.viewModel().clear()
@@ -418,7 +481,7 @@ class BinViewLoader(QtCore.QRunnable):
 	class Signals(QtCore.QObject):
 
 		sig_begin_loading = QtCore.Signal()
-		sig_got_bin_appearance_settings = QtCore.Signal(object, object, object, object, object)
+		sig_got_bin_appearance_settings = QtCore.Signal(object, object, object, object, object, object)
 		sig_got_display_options = QtCore.Signal(object)
 		sig_got_view_settings = QtCore.Signal(object)
 		sig_got_mob = QtCore.Signal(object)
@@ -446,12 +509,17 @@ class BinViewLoader(QtCore.QRunnable):
 		self._signals.sig_done_loading.emit()
 
 	def _loadBinAppearanceSettings(self, bin_content:avb.bin.Bin):
+		"""General and misc appearance settings stored around the bin"""
+
+		# Sus out that font name
+		# Try for Bin Font Name (strongly preferred), or fall back on mac font index (not likely to work)
 		if "attributes" in bin_content.property_data and "ATTR__BIN_FONT_NAME" in bin_content.attributes:
 			bin_font = bin_content.attributes["ATTR__BIN_FONT_NAME"]
 		else:
 			bin_font = bin_content.mac_font
 
-		# Try to load bin column widths from the "BIN_COLUMNS_WIDTHS" bytearray, which decodes to JSON
+		# Try to load bin column widths from the "BIN_COLUMNS_WIDTHS" bytearray, which decodes to a JSON string
+		# I'm decoding it as UTF-8 but I almost doubt that's truly what it is.
 		try:
 			import json
 			bin_column_widths = json.loads(bin_content.attributes.get("BIN_COLUMNS_WIDTHS",{}).decode("utf-8"))
@@ -463,7 +531,9 @@ class BinViewLoader(QtCore.QRunnable):
 			bin_content.mac_font_size,
 			bin_content.forground_color,
 			bin_content.background_color,
-			bin_column_widths)
+			bin_column_widths,
+			bin_content.home_rect,
+		)
 		
 	def _loadBinDisplayItemTypes(self, bin_content:avb.bin.Bin):
 		self._signals.sig_got_display_options.emit(avbutils.BinDisplayItemTypes.get_options_from_bin(bin_content))
@@ -630,6 +700,7 @@ class MainApplication(QtWidgets.QApplication):
 		self._wnd_main = QtWidgets.QMainWindow()
 		self._wnd_main.resize(1024, 600)
 		self._wnd_main.setCentralWidget(self._tree_bin_contents)
+		self._appearance_presenter.sig_window_rect_changed.connect(self._view_BinAppearanceSettings.setBinRect)
 
 
 		dock_font = QtWidgets.QDockWidget().font()
