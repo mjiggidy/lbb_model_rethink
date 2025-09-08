@@ -95,6 +95,12 @@ class BinAppearanceSettingsView(QtWidgets.QWidget):
 
 		self.layout().addLayout(lay_colors)
 
+		self._tree_column_widths = BinTreeView()
+		self.layout().addWidget(QtWidgets.QLabel("Column Widths"))
+		self.layout().addWidget(self._tree_column_widths)
+
+		self.layout().addStretch()
+
 		self._cmb_fonts.currentFontChanged.connect(self.sig_font_changed)
 		self._spn_size.valueChanged.connect(lambda: self.sig_font_changed.emit(self.binFont()))
 
@@ -194,7 +200,6 @@ class BinTreeView(QtWidgets.QTreeView):
 
 	def columnDisplayNames(self) -> list[str]:
 		"""Get all column display names, in order"""
-		print(self.model().columnCount())
 		return [
 			self.model().headerData(idx,
 				QtCore.Qt.Orientation.Horizontal,
@@ -213,7 +218,6 @@ class BinTreeView(QtWidgets.QTreeView):
 
 		if not column_widths:
 			self.resizeAllColumnsToContents()
-			print("No")
 			return
 		column_names = self.columnDisplayNames()
 
@@ -292,7 +296,7 @@ class BinViewPropertyDataPresenter(presenters.LBItemDefinitionView):
 		for key,val in bin_view.property_data.items():
 			self.addRow({"name": key, "value": val})
 
-class BinAppearanceSettingsPresenter(QtCore.QObject):
+class BinAppearanceSettingsPresenter(presenters.LBItemDefinitionView):
 
 	sig_font_changed          = QtCore.Signal(QtGui.QFont)
 	sig_palette_changed       = QtCore.Signal(QtGui.QColor, QtGui.QColor)
@@ -316,13 +320,25 @@ class BinAppearanceSettingsPresenter(QtCore.QObject):
 		
 		font.setPixelSize(mac_font_size)
 
+		self.updateColumnWidths(column_widths)
 		self.sig_column_widths_changed.emit(column_widths)
 		self.sig_font_changed.emit(font)
 		self.sig_palette_changed.emit(
 			QtGui.QColor.fromRgba64(*foreground_color),
 			QtGui.QColor.fromRgba64(*background_color),
 		)
-		
+	
+	@QtCore.Slot(object)
+	def updateColumnWidths(self, column_widths:dict[str,int]):
+		"""Display column width settings"""
+
+		self.viewModel().clear()
+
+		for col, width in column_widths.items():
+			self.addRow({
+				"Width":  width,
+				"Column": col,
+			}, add_new_headers=True)
 
 class BinSortingPropertiesPresenter(presenters.LBItemDefinitionView):
 	"""Bin sorting"""
@@ -562,6 +578,7 @@ class MainApplication(QtWidgets.QApplication):
 
 		self._prog_loading = QtWidgets.QProgressBar()
 		self._prog_loading.setWindowModality(QtCore.Qt.WindowModality.ApplicationModal)
+		self._prog_loading.setWindowFlag(QtCore.Qt.WindowType.Tool)
 		self._prog_loading.setRange(0,0)
 		self._prog_loading.setWindowTitle("Loading bin...")
 
@@ -581,6 +598,7 @@ class MainApplication(QtWidgets.QApplication):
 		self._view_BinDisplayItemTypes = BinDisplayItemTypesView()
 		
 		self._view_BinAppearanceSettings = BinAppearanceSettingsView()
+		self._view_BinAppearanceSettings._tree_column_widths.model().setSourceModel(self._appearance_presenter.viewModel())
 		self._appearance_presenter.sig_font_changed.connect(self._view_BinAppearanceSettings.setBinFont)
 		self._appearance_presenter.sig_palette_changed.connect(self._view_BinAppearanceSettings.setBinPalette)
 		self._view_BinAppearanceSettings.sig_font_changed.connect(self._appearance_presenter.sig_font_changed)
@@ -670,7 +688,6 @@ class MainApplication(QtWidgets.QApplication):
 		palette.setColor(QtGui.QPalette.ColorRole.AlternateBase, bg.darker(125))
 
 		self._tree_bin_contents.setPalette(palette)
-		#self._tree_bin_contents.header().setPalette(palette)
 
 	@QtCore.Slot(QtCore.QModelIndex)
 	def focusBinColumn(self, index:QtCore.QModelIndex):
