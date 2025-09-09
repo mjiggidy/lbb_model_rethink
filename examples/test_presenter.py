@@ -117,6 +117,9 @@ class BinAppearanceSettingsView(QtWidgets.QWidget):
 
 		self.layout().addLayout(lay_geo)
 
+		self._chk_was_iconic = QtWidgets.QCheckBox("Was Iconic")
+		self.layout().addWidget(self._chk_was_iconic)
+
 		lay_fonts = QtWidgets.QHBoxLayout()
 		self._cmb_fonts = QtWidgets.QFontComboBox()
 		self._spn_size  = QtWidgets.QSpinBox(minimum=8, maximum=100)	# Avid font dialog extents
@@ -148,6 +151,10 @@ class BinAppearanceSettingsView(QtWidgets.QWidget):
 		self._btn_fg_color.clicked.connect(self.fgColorPickerRequested)
 		self._btn_bg_color.clicked.connect(self.bgColorPickerRequested)
 
+	@QtCore.Slot(bool)
+	def setWasIconic(self, was_iconic:bool):
+		print(was_iconic)
+		self._chk_was_iconic.setChecked(was_iconic)
 
 	# TODO I'm sure this can be one method
 	@QtCore.Slot()
@@ -352,15 +359,17 @@ class BinAppearanceSettingsPresenter(presenters.LBItemDefinitionView):
 	sig_palette_changed       = QtCore.Signal(QtGui.QColor, QtGui.QColor)
 	sig_column_widths_changed = QtCore.Signal(object)
 	sig_window_rect_changed   = QtCore.Signal(object)
+	sig_was_iconic_changed    = QtCore.Signal(bool)
 
-	@QtCore.Slot(object, object, object, object, object, object)
+	@QtCore.Slot(object, object, object, object, object, object, object)
 	def setAppearanceSettings(self,
 		bin_font:str|int,
 		mac_font_size:int,
 		foreground_color:list[int],
 		background_color:list[int],
 		column_widths:dict[str,int],
-		window_rect:list[int]):
+		window_rect:list[int],
+		was_iconic:bool):
 		
 		font = QtGui.QFont()
 
@@ -374,6 +383,7 @@ class BinAppearanceSettingsPresenter(presenters.LBItemDefinitionView):
 
 		self.setColumnWidths(column_widths)
 		self.setWindowRect(window_rect)
+		self.sig_was_iconic_changed.emit(was_iconic)
 		self.sig_column_widths_changed.emit(column_widths)
 		self.sig_font_changed.emit(font)
 		self.sig_palette_changed.emit(
@@ -481,7 +491,7 @@ class BinViewLoader(QtCore.QRunnable):
 	class Signals(QtCore.QObject):
 
 		sig_begin_loading = QtCore.Signal()
-		sig_got_bin_appearance_settings = QtCore.Signal(object, object, object, object, object, object)
+		sig_got_bin_appearance_settings = QtCore.Signal(object, object, object, object, object, object, object)
 		sig_got_display_options = QtCore.Signal(object)
 		sig_got_view_settings = QtCore.Signal(object)
 		sig_got_mob = QtCore.Signal(object)
@@ -538,6 +548,7 @@ class BinViewLoader(QtCore.QRunnable):
 			bin_content.background_color,
 			bin_column_widths,
 			bin_content.home_rect,
+			bin_content.was_iconic,
 		)
 		
 	def _loadBinDisplayItemTypes(self, bin_content:avb.bin.Bin):
@@ -675,6 +686,7 @@ class MainApplication(QtWidgets.QApplication):
 		self._appearance_presenter.sig_font_changed.connect(self._view_BinAppearanceSettings.setBinFont)
 		self._appearance_presenter.sig_palette_changed.connect(self._view_BinAppearanceSettings.setBinPalette)
 		self._view_BinAppearanceSettings.sig_font_changed.connect(self._appearance_presenter.sig_font_changed)
+		self._appearance_presenter.sig_was_iconic_changed.connect(self._view_BinAppearanceSettings.setWasIconic)
 		#self._view_BinAppearanceSettings.sig_palette_changed.connect(self._appearance_presenter.sig)
 		# Incomplete
 
