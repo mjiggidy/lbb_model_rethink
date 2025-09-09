@@ -1,5 +1,5 @@
 import sys, os
-import avb, avbutils
+import avb, avbutils, timecode
 from PySide6 import QtCore, QtGui, QtWidgets
 from trt_model import presenters, viewitems, viewmodels, delegates
 
@@ -504,7 +504,12 @@ class BinViewLoader(QtCore.QRunnable):
 			self._loadBinSiftSettings(bin_handle.content.sifted, bin_handle.content.sifted_settings)
 			self._loadBinSorting(bin_handle.content.sort_columns)
 			self._loadBinAppearanceSettings(bin_handle.content)
-			self._loadCompositionMobs(bin_handle.content.items)
+			
+			for bin_item in bin_handle.content.items:
+				try:
+					self._loadCompositionMob(bin_item)
+				except Exception as e:
+					print(f"{e} {bin_item.mob}")
 		
 		self._signals.sig_done_loading.emit()
 
@@ -551,86 +556,84 @@ class BinViewLoader(QtCore.QRunnable):
 	def _loadBinSorting(self, bin_sorting:list):
 		self.signals().sig_got_sort_settings.emit(bin_sorting)
 
-	def _loadCompositionMobs(self, bin_items:list[avb.bin.BinItem]):
+	def _loadCompositionMob(self, bin_item:avb.bin.BinItem):
 			
-			import timecode
+			#if not bin_item.user_placed:
+			#	return
 			
-			for bin_item in bin_items:
+			bin_item_role = avbutils.BinDisplayItemTypes.from_bin_item(bin_item)
+			#print(display_options)
 
-				if not bin_item.user_placed:
-					continue
+			comp = bin_item.mob
+
+
+			if avbutils.BinDisplayItemTypes.SEQUENCES in bin_item_role:
+				timecode_range = avbutils.get_timecode_range_for_composition(comp)
+				tape_name = None
+				user_attributes = comp.attributes.get("_USER",{})
+
+			elif avbutils.BinDisplayItemTypes.MASTER_CLIPS in bin_item_role:
+
+
+				source_mob = avbutils.matchback_to_sourcemob(comp)
+				#print(source_mob)
+				tape_name = source_mob.name
+				source_mob_timecode_range = avbutils.get_timecode_range_for_composition(source_mob)
+				timecode_range = timecode.TimecodeRange(start=source_mob_timecode_range.start, duration=comp.length)
+
+				user_attributes = comp.attributes.get("_USER",{})
+
+			elif avbutils.BinDisplayItemTypes.SUBCLIPS in bin_item_role:
+
+				source_clip = avbutils.matchback_to_sourceclip(comp)
+				subclip_offset = (source_clip.start_time)
 				
-				bin_item_role = avbutils.BinDisplayItemTypes.from_bin_item(bin_item)
-				#print(display_options)
-
-				comp = bin_item.mob
-
-
-				if avbutils.BinDisplayItemTypes.SEQUENCES in bin_item_role:
-					timecode_range = avbutils.get_timecode_range_for_composition(comp)
-					tape_name = None
-					user_attributes = comp.attributes.get("_USER",{})
-
-				elif avbutils.BinDisplayItemTypes.MASTER_CLIPS in bin_item_role:
-
-
-					source_mob = avbutils.matchback_to_sourcemob(comp)
-					#print(source_mob)
-					tape_name = source_mob.name
-					source_mob_timecode_range = avbutils.get_timecode_range_for_composition(source_mob)
-					timecode_range = timecode.TimecodeRange(start=source_mob_timecode_range.start, duration=comp.length)
-
-					user_attributes = comp.attributes.get("_USER",{})
-
-				elif avbutils.BinDisplayItemTypes.SUBCLIPS in bin_item_role:
-
-					source_clip = avbutils.matchback_to_sourceclip(comp)
-					subclip_offset = (source_clip.start_time)
-					
-					
-					subclip_master = avbutils.matchback_sourceclip(source_clip)
-					#print(subclip_master.start)
-
-					source_mob = avbutils.matchback_to_sourcemob(subclip_master)
-					#print(source_mob)
-
-					tape_name = source_mob.name
-					source_mob_timecode_range = avbutils.get_timecode_range_for_composition(source_mob)
-					timecode_range = timecode.TimecodeRange(start=source_mob_timecode_range.start + subclip_offset, duration=comp.length)
-
-					#print(comp.attributes.get("_USER",{}))
-					user_attributes = comp.attributes.get("_USER",{})
-					#print(timecode_range)
-						
-
-					#timecode_range = None
-					#tape_name = ""
-						
-
-
-				markers = avbutils.get_markers_from_timeline(comp)
-				#print(comp.property_data)
-
-				item = {
-					avbutils.BIN_COLUMN_ROLES["Name"]: comp.name,
-					avbutils.BIN_COLUMN_ROLES["Color"]: viewitems.TRTClipColorViewItem(avbutils.composition_clip_color(comp) if avbutils.composition_clip_color(comp) else None),
-					avbutils.BIN_COLUMN_ROLES["Start"]: timecode_range.start,
-					avbutils.BIN_COLUMN_ROLES["End"]: timecode_range.end,
-					avbutils.BIN_COLUMN_ROLES["Duration"]: viewitems.TRTDurationViewItem(timecode_range.duration),
-					avbutils.BIN_COLUMN_ROLES["Modified Date"]: comp.last_modified,
-					avbutils.BIN_COLUMN_ROLES["Creation Date"]: comp.creation_time,
-					avbutils.BIN_COLUMN_ROLES[""]: bin_item_role,
-					avbutils.BIN_COLUMN_ROLES["Marker"]: viewitems.TRTMarkerViewItem(markers[0]) if markers else None,
-					avbutils.BIN_COLUMN_ROLES["Tracks"]: avbutils.format_track_labels(list(avbutils.get_tracks_from_composition(comp))),
-					avbutils.BIN_COLUMN_ROLES["Tape"]: tape_name if tape_name else "",
-					avbutils.BIN_COLUMN_ROLES["Scene"]: user_attributes.get("Scene"),
-					avbutils.BIN_COLUMN_ROLES["Take"]: user_attributes.get("Take")
-				}
-
-				for key, val in user_attributes.items():
-					item.update({"40_"+key: val})
 				
-				self._signals.sig_got_mob.emit(item)
+				subclip_master = avbutils.matchback_sourceclip(source_clip)
+				#print(subclip_master.start)
+
+				source_mob = avbutils.matchback_to_sourcemob(subclip_master)
+				#print(source_mob)
+
+				tape_name = source_mob.name
+				source_mob_timecode_range = avbutils.get_timecode_range_for_composition(source_mob)
+				timecode_range = timecode.TimecodeRange(start=source_mob_timecode_range.start + subclip_offset, duration=comp.length)
+
+				#print(comp.attributes.get("_USER",{}))
+				user_attributes = comp.attributes.get("_USER",{})
+				#print(timecode_range)
+					
+
+			else:
+				timecode_range = None
+				tape_name = ""
+				user_attributes = {}
+					
+
+
+			markers = avbutils.get_markers_from_timeline(comp)
+			#print(comp.property_data)
+
+			item = {
+				avbutils.BIN_COLUMN_ROLES["Name"]: comp.name,
+				avbutils.BIN_COLUMN_ROLES["Color"]: viewitems.TRTClipColorViewItem(avbutils.composition_clip_color(comp) if avbutils.composition_clip_color(comp) else None),
+				avbutils.BIN_COLUMN_ROLES["Start"]: timecode_range.start if timecode_range else None,
+				avbutils.BIN_COLUMN_ROLES["End"]: timecode_range.end if timecode_range else None,
+				avbutils.BIN_COLUMN_ROLES["Duration"]: viewitems.TRTDurationViewItem(timecode_range.duration) if timecode_range else None,
+				avbutils.BIN_COLUMN_ROLES["Modified Date"]: comp.last_modified,
+				avbutils.BIN_COLUMN_ROLES["Creation Date"]: comp.creation_time,
+				avbutils.BIN_COLUMN_ROLES[""]: bin_item_role,
+				avbutils.BIN_COLUMN_ROLES["Marker"]: viewitems.TRTMarkerViewItem(markers[0]) if markers else None,
+				avbutils.BIN_COLUMN_ROLES["Tracks"]: avbutils.format_track_labels(list(avbutils.get_tracks_from_composition(comp))),
+				avbutils.BIN_COLUMN_ROLES["Tape"]: tape_name if tape_name else "",
+				avbutils.BIN_COLUMN_ROLES["Scene"]: user_attributes.get("Scene"),
+				avbutils.BIN_COLUMN_ROLES["Take"]: user_attributes.get("Take")
+			}
+
+			for key, val in user_attributes.items():
+				item.update({"40_"+key: val})
+			
+			self._signals.sig_got_mob.emit(item)
 
 	
 	def signals(self) -> Signals:
@@ -648,7 +651,7 @@ class MainApplication(QtWidgets.QApplication):
 
 		self._prog_loading = QtWidgets.QProgressBar()
 		self._prog_loading.setWindowModality(QtCore.Qt.WindowModality.ApplicationModal)
-		self._prog_loading.setWindowFlag(QtCore.Qt.WindowType.Tool)
+		#self._prog_loading.setWindowFlag(QtCore.Qt.WindowType.Tool)
 		self._prog_loading.setRange(0,0)
 		self._prog_loading.setWindowTitle("Loading bin...")
 
@@ -755,9 +758,17 @@ class MainApplication(QtWidgets.QApplication):
 		palette.setColor(QtGui.QPalette.ColorRole.Text, fg)
 		palette.setColor(QtGui.QPalette.ColorRole.ButtonText, fg)
 		palette.setColor(QtGui.QPalette.ColorRole.Base, bg)
-		palette.setColor(QtGui.QPalette.ColorRole.Button, bg.darker(125))
 		palette.setColor(QtGui.QPalette.ColorRole.AlternateBase, bg.darker(125))
+		palette.setColor(QtGui.QPalette.ColorRole.Button, bg.darker(125))
 
+
+		# Fusion scrollbar uses these colors per https://doc.qt.io/qtforpython-6/PySide6/QtGui/QPalette.html
+		# Although it... like... doesn't? lol
+		palette.setColor(QtGui.QPalette.ColorRole.Light,    palette.color(QtGui.QPalette.ColorRole.Button).lighter(125))   # Lighter than Button color
+		palette.setColor(QtGui.QPalette.ColorRole.Midlight, palette.color(QtGui.QPalette.ColorRole.Button).lighter(75))    # Between Button and Light
+		palette.setColor(QtGui.QPalette.ColorRole.Mid,      palette.color(QtGui.QPalette.ColorRole.Button).darker(75))     # Between Button and Dark
+		palette.setColor(QtGui.QPalette.ColorRole.Dark,     palette.color(QtGui.QPalette.ColorRole.Button).darker(125))    # Darker than Button
+		
 		self._tree_bin_contents.setPalette(palette)
 
 	@QtCore.Slot(QtCore.QModelIndex)
@@ -850,7 +861,7 @@ class MainApplication(QtWidgets.QApplication):
 		self._worker.signals().sig_done_loading.connect(lambda: self._tree_column_defs.sortByColumn(0, QtCore.Qt.SortOrder.AscendingOrder))
 		self._worker.signals().sig_done_loading.connect(lambda: self._tree_property_data.sortByColumn(0, QtCore.Qt.SortOrder.DescendingOrder))
 
-		self._worker.signals().sig_done_loading.connect(self._prog_loading.hide)
+		self._worker.signals().sig_done_loading.connect(self._prog_loading.close)
 		self._threadpool.start(self._worker)
 	
 	@QtCore.Slot()
