@@ -578,47 +578,55 @@ class BinViewLoader(QtCore.QRunnable):
 			comp = bin_item.mob
 
 
+			tape_name = None
+			source_file_name = None
+			timecode_range = None
+			user_attributes = dict()
+
 			if avbutils.BinDisplayItemTypes.SEQUENCES in bin_item_role:
 				timecode_range = avbutils.get_timecode_range_for_composition(comp)
-				tape_name = None
 				user_attributes = comp.attributes.get("_USER",{})
-
-			elif avbutils.BinDisplayItemTypes.MASTER_CLIPS in bin_item_role:
-
-
-				source_mob = avbutils.matchback_to_sourcemob(comp)
-				#print(source_mob)
-				tape_name = source_mob.name
-				source_mob_timecode_range = avbutils.get_timecode_range_for_composition(source_mob)
-				timecode_range = timecode.TimecodeRange(start=source_mob_timecode_range.start, duration=comp.length)
-
-				user_attributes = comp.attributes.get("_USER",{})
-
-			elif avbutils.BinDisplayItemTypes.SUBCLIPS in bin_item_role:
-
-				source_clip = avbutils.matchback_to_sourceclip(comp)
-				subclip_offset = (source_clip.start_time)
-				
-				
-				subclip_master = avbutils.matchback_sourceclip(source_clip)
-				#print(subclip_master.start)
-
-				source_mob = avbutils.matchback_to_sourcemob(subclip_master)
-				#print(source_mob)
-
-				tape_name = source_mob.name
-				source_mob_timecode_range = avbutils.get_timecode_range_for_composition(source_mob)
-				timecode_range = timecode.TimecodeRange(start=source_mob_timecode_range.start + subclip_offset, duration=comp.length)
-
-				#print(comp.attributes.get("_USER",{}))
-				user_attributes = comp.attributes.get("_USER",{})
-				#print(timecode_range)
-					
 
 			else:
-				timecode_range = None
-				tape_name = ""
-				user_attributes = {}
+
+				#primary_track = avbutils.format_track_label(avbutils.sourcerefs.primary_track_for_composition(comp))
+
+				if avbutils.sourcerefs.composition_has_physical_source(comp):
+				
+					if avbutils.sourcerefs.physical_source_type_for_composition(comp) == avbutils.SourceMobRole.SOURCE_FILE:
+						source_file_name = avbutils.sourcerefs.physical_source_name_for_composition(comp)
+					else:
+						tape_name = avbutils.sourcerefs.physical_source_name_for_composition(comp)
+				
+				# Timecode
+				attributes_reverse = []
+				for source, offset in avbutils.source_references_for_component(avbutils.sourcerefs.primary_track_for_composition(comp).component):
+					
+					if "attributes" in source.mob.property_data:
+						attributes_reverse.append(source.mob.attributes.get("_USER",{}))
+					
+					# Timecode
+					try:
+						tc_track = next(avbutils.get_tracks_from_composition(source.mob, type=avbutils.TrackTypes.TIMECODE, index=1))
+					except:
+						pass
+					else:
+						tc_component, offset = avbutils.resolve_base_component_from_component(tc_track.component, offset + source.start_time)
+						
+						if not isinstance(tc_component, avb.components.Timecode):
+							print("Hmm")
+							continue
+						
+						timecode_range = timecode.TimecodeRange(
+							start = timecode.Timecode(tc_component.start + offset.frame_number, rate=offset.rate),
+							duration=comp.length
+						)
+				for a in reversed(attributes_reverse):
+					user_attributes.update(a)
+				if "attributes" in comp.property_data:
+					user_attributes.update(comp.attributes.get("_USER",{}))
+
+
 					
 
 
@@ -626,17 +634,18 @@ class BinViewLoader(QtCore.QRunnable):
 			#print(comp.property_data)
 
 			item = {
-				avbutils.BIN_COLUMN_ROLES["Name"]: comp.name,
+				avbutils.BIN_COLUMN_ROLES["Name"]: comp.name or "",
 				avbutils.BIN_COLUMN_ROLES["Color"]: viewitems.TRTClipColorViewItem(avbutils.composition_clip_color(comp) if avbutils.composition_clip_color(comp) else None),
-				avbutils.BIN_COLUMN_ROLES["Start"]: timecode_range.start if timecode_range else None,
-				avbutils.BIN_COLUMN_ROLES["End"]: timecode_range.end if timecode_range else None,
-				avbutils.BIN_COLUMN_ROLES["Duration"]: viewitems.TRTDurationViewItem(timecode_range.duration) if timecode_range else None,
+				avbutils.BIN_COLUMN_ROLES["Start"]: timecode_range.start if timecode_range else "",
+				avbutils.BIN_COLUMN_ROLES["End"]: timecode_range.end if timecode_range else "",
+				avbutils.BIN_COLUMN_ROLES["Duration"]: viewitems.TRTDurationViewItem(timecode_range.duration) if timecode_range else "",
 				avbutils.BIN_COLUMN_ROLES["Modified Date"]: comp.last_modified,
 				avbutils.BIN_COLUMN_ROLES["Creation Date"]: comp.creation_time,
 				avbutils.BIN_COLUMN_ROLES[""]: bin_item_role,
 				avbutils.BIN_COLUMN_ROLES["Marker"]: viewitems.TRTMarkerViewItem(markers[0]) if markers else None,
 				avbutils.BIN_COLUMN_ROLES["Tracks"]: avbutils.format_track_labels(list(avbutils.get_tracks_from_composition(comp))),
-				avbutils.BIN_COLUMN_ROLES["Tape"]: tape_name if tape_name else "",
+				avbutils.BIN_COLUMN_ROLES["Tape"]: tape_name or "",
+				avbutils.BIN_COLUMN_ROLES["Source File"]: source_file_name or "",
 				avbutils.BIN_COLUMN_ROLES["Scene"]: user_attributes.get("Scene"),
 				avbutils.BIN_COLUMN_ROLES["Take"]: user_attributes.get("Take")
 			}
