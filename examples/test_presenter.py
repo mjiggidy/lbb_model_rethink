@@ -643,11 +643,11 @@ class BinViewLoader(QtCore.QRunnable):
 				avbutils.BIN_COLUMN_ROLES["Creation Date"]: comp.creation_time,
 				avbutils.BIN_COLUMN_ROLES[""]: bin_item_role,
 				avbutils.BIN_COLUMN_ROLES["Marker"]: viewitems.TRTMarkerViewItem(markers[0]) if markers else None,
-				avbutils.BIN_COLUMN_ROLES["Tracks"]: avbutils.format_track_labels(list(avbutils.get_tracks_from_composition(comp))),
+				avbutils.BIN_COLUMN_ROLES["Tracks"]: avbutils.format_track_labels(list(avbutils.get_tracks_from_composition(comp))) or None,
 				avbutils.BIN_COLUMN_ROLES["Tape"]: tape_name or "",
 				avbutils.BIN_COLUMN_ROLES["Source File"]: source_file_name or "",
-				avbutils.BIN_COLUMN_ROLES["Scene"]: user_attributes.get("Scene"),
-				avbutils.BIN_COLUMN_ROLES["Take"]: user_attributes.get("Take")
+				avbutils.BIN_COLUMN_ROLES["Scene"]: user_attributes.get("Scene") or "",
+				avbutils.BIN_COLUMN_ROLES["Take"]: user_attributes.get("Take") or "",
 			}
 
 			for key, val in user_attributes.items():
