@@ -17,6 +17,11 @@ class LBClipColorItemDelegate(QtWidgets.QStyledItemDelegate):
 	def paint(self, painter:QtGui.QPainter, option:QtWidgets.QStyleOptionViewItem, index:QtCore.QModelIndex):
 
 		super().paint(painter, option, index)
+		
+		color = index.data(QtCore.Qt.ItemDataRole.UserRole)
+		if not isinstance(color, QtGui.QColor):
+			return
+		
 		painter.save()
 
 		# Center, size and shape the canvas QRect
