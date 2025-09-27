@@ -599,6 +599,12 @@ class BinViewLoader(QtCore.QRunnable):
 						tape_name = avbutils.sourcerefs.physical_source_name_for_composition(comp)
 				
 				# Timecode
+				# NOTE: This is all pretty sloppy here.
+				try:
+					timecode_range = avbutils.get_timecode_range_for_composition(comp)
+				except Exception as e:
+					pass
+
 				attributes_reverse = []
 				for source, offset in avbutils.source_references_for_component(avbutils.sourcerefs.primary_track_for_composition(comp).component):
 					
