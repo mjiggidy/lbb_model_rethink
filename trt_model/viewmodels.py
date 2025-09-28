@@ -4,6 +4,7 @@ View Models
 import typing
 from .viewitems import TRTAbstractViewItem, TRTAbstractViewHeaderItem
 from PySide6 import QtCore
+import avbutils
 
 class TRTSortFilterProxyModel(QtCore.QSortFilterProxyModel):
 	"""QSortFilterProxyModel that implements natural sorting and such"""
@@ -16,16 +17,45 @@ class TRTSortFilterProxyModel(QtCore.QSortFilterProxyModel):
 		self._sort_collator.setNumericMode(True)
 		self._sort_collator.setCaseSensitivity(QtCore.Qt.CaseSensitivity.CaseInsensitive)
 
+		self._bin_display_items = avbutils.BinDisplayItemTypes(0)
+
 		self.setSortRole(QtCore.Qt.ItemDataRole.InitialSortOrderRole)
+
+	def filterAcceptsRow(self, source_row:int, source_parent:QtCore.QModelIndex) -> bool:
+		
+		BIN_TYPES_COLUMN = 1
+		
+		item_types = self.data(
+			self.index(source_row, BIN_TYPES_COLUMN, source_parent), QtCore.Qt.ItemDataRole.UserRole
+		)
+		
+		#if isinstance(item_types, avbutils.BinDisplayItemTypes):
+		#	print(source_row, item_types, avbutils.BinDisplayItemTypes.SHOW_CLIPS_CREATED_BY_USER in item_types)
+		#	return avbutils.BinDisplayItemTypes.SHOW_CLIPS_CREATED_BY_USER in item_types
+		#
+		return super().filterAcceptsRow(source_row, source_parent)
+		
+		
+		
+		#print(item_types & self.binDisplayItemTypes())
+		#return bool(item_types & self.binDisplayItemTypes())
+
 	
 	def lessThan(self, source_left:QtCore.QModelIndex, source_right:QtCore.QModelIndex) -> bool:
 		return self._sort_collator.compare(
 			source_left.data(self.sortRole()),
 			source_right.data(self.sortRole())
 		) <= 0	# gt OR EQUAL TO reverses sort even if all thingies are equal, I like it
-		
-		#return super().lessThan(source_left, source_right)
 	
+	def setBinDisplayItemTypes(self, types:avbutils.BinDisplayItemTypes):
+
+		self._bin_display_items = types
+		self.invalidateRowsFilter()
+		print(self.binDisplayItemTypes())
+	
+	def binDisplayItemTypes(self) -> avbutils.BinDisplayItemTypes:
+		return self._bin_display_items
+		
 
 class TRTTimelineViewModel(QtCore.QAbstractItemModel):
 	"""A view model for timelines"""

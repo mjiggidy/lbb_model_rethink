@@ -265,6 +265,12 @@ class BinTreeView(QtWidgets.QTreeView):
 			for idx in range(self.header().count())
 		]
 	
+	def setBinDisplayItemTypes(self, types:avbutils.BinDisplayItemTypes):
+		self.model().setBinDisplayItemTypes(types)
+	
+	def binDisplayItemTypes(self) -> avbutils.BinDisplayItemTypes:
+		return self.model().binDisplayItemTypes()
+	
 	@QtCore.Slot()
 	def resizeAllColumnsToContents(self):
 		for idx in range(self.header().count()):
@@ -863,6 +869,7 @@ class MainApplication(QtWidgets.QApplication):
 		self._worker.signals().sig_begin_loading.connect(self._prog_loading.show)
 
 		self._worker.signals().sig_got_display_options.connect(self._view_BinDisplayItemTypes.setOptions)
+		self._worker.signals().sig_got_display_options.connect(self._tree_bin_contents.model().setBinDisplayItemTypes)
 
 		self._worker.signals().sig_got_bin_appearance_settings.connect(self._appearance_presenter.setAppearanceSettings)
 		
