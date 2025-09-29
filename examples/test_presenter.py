@@ -1,3 +1,8 @@
+"""
+This spiraled out of control into an Avid bin viewer
+I'll eventually pull this out and into its own project
+"""
+
 import sys, os, enum
 import avb, avbutils, timecode
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -70,9 +75,9 @@ class BinDisplayItemTypesView(AbstractEnumFlagsView):
 		
 		self.setLayout(QtWidgets.QVBoxLayout())
 		self.layout().setSpacing(0)
-		self.layout().setContentsMargins(0,0,0,0)
+		self.layout().setContentsMargins(3,0,3,0)
 
-		grp_clips = QtWidgets.QGroupBox()
+		grp_clips = QtWidgets.QGroupBox(title="Clip Types")
 
 		grp_clips.setLayout(QtWidgets.QVBoxLayout())
 		grp_clips.layout().setSpacing(0)
@@ -124,7 +129,7 @@ class BinDisplayItemTypesView(AbstractEnumFlagsView):
 
 		self.layout().addWidget(grp_clips)
 
-		grp_origins = QtWidgets.QGroupBox()
+		grp_origins = QtWidgets.QGroupBox(title="Clip Origins")
 		grp_origins.setLayout(QtWidgets.QVBoxLayout())
 		grp_origins.layout().setSpacing(0)
 		grp_origins.layout().setContentsMargins(3,0,3,0)
@@ -374,15 +379,19 @@ class BinTreeView(QtWidgets.QTreeView):
 	def setColumnWidths(self, column_widths:dict[str,int]):
 
 		if not column_widths:
+
 			self.resizeAllColumnsToContents()
 			return
+		
 		column_names = self.columnDisplayNames()
 
 		for col, width in column_widths.items():
+		
 			try:
 				col_idx = column_names.index(col)
 			except ValueError:
 				continue
+		
 			self.setColumnWidth(col_idx, width)
 	
 	@QtCore.Slot(str, QtCore.Qt.SortOrder)
@@ -683,7 +692,7 @@ class BinViewLoader(QtCore.QRunnable):
 			timecode_range = None
 			user_attributes = dict()
 
-			if avbutils.BinDisplayItemTypes.SEQUENCES in bin_item_role:
+			if avbutils.BinDisplayItemTypes.SEQUENCE in bin_item_role:
 				timecode_range = avbutils.get_timecode_range_for_composition(comp)
 				user_attributes = comp.attributes.get("_USER",{})
 
@@ -990,11 +999,15 @@ class MainApplication(QtWidgets.QApplication):
 		self._worker.signals().sig_done_loading.connect(self._tree_column_defs.resizeAllColumnsToContents)
 		self._worker.signals().sig_done_loading.connect(self._tree_property_data.resizeAllColumnsToContents)
 		self._worker.signals().sig_done_loading.connect(self._tree_sort_properties.resizeAllColumnsToContents)
+		
+		# Once content is loaded, resize bin columns to fit, then re-apply any custom widths that were lost
+		self._worker.signals().sig_done_loading.connect(self._tree_bin_contents.resizeAllColumnsToContents)
+		# NOTE: Column widths aren't stored outside of the view model, need to implement
+		#self._worker.signals().sig_done_loading.connect(lambda: self._tree_bin_contents.setColumnWidths(self._view_BinAppearanceSettings._tree_column_widths))
 
 		#self._worker.signals().sig_done_loading.connect(lambda: self._tree_bin_contents.sortByColumn(0, QtCore.Qt.SortOrder.AscendingOrder))
 		self._worker.signals().sig_done_loading.connect(lambda: self._tree_column_defs.sortByColumn(0, QtCore.Qt.SortOrder.AscendingOrder))
 		self._worker.signals().sig_done_loading.connect(lambda: self._tree_property_data.sortByColumn(0, QtCore.Qt.SortOrder.DescendingOrder))
-
 		self._worker.signals().sig_done_loading.connect(self._prog_loading.close)
 		self._threadpool.start(self._worker)
 	
