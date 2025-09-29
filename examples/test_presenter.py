@@ -1,52 +1,146 @@
-import sys, os
+import sys, os, enum
 import avb, avbutils, timecode
 from PySide6 import QtCore, QtGui, QtWidgets
 from trt_model import presenters, viewitems, viewmodels, delegates
 
-class BinDisplayItemTypesView(QtWidgets.QWidget):
+class AbstractEnumFlagsView(QtWidgets.QWidget):
 
-	sig_option_toggled  = QtCore.Signal(object, bool)
-	sig_options_changed = QtCore.Signal(object)
+	sig_flag_toggled  = QtCore.Signal(object, bool)
+	sig_flags_changed = QtCore.Signal(object)
+
+	def __init__(self, initial_values:enum.Flag=None, *args, **kwargs):
+
+		super().__init__(*args, **kwargs)
+
+		self._option_mappings:dict[enum.Flag, QtWidgets.QCheckBox] = dict()
+
+		self._flags = initial_values
+
+		# Set initial values
+		for option in self._flags.__class__.__members__.values():
+
+			chk_option = QtWidgets.QCheckBox(text=option.name.replace("_"," ").title())
+			chk_option.setProperty("checkvalue", option)
+			
+			chk_option.clicked.connect(lambda is_checked, option=option:self._option_changed(option, is_checked))
+			
+			self._option_mappings[option] = chk_option
+
+		self.updateCheckStates()
+		
+	@QtCore.Slot(object)
+	def _option_changed(self, option:enum.Flag, is_enabled:bool):
+
+
+		if is_enabled:
+			self._flags |= option
+		else:
+			self._flags &= ~option
+
+		self.sig_flag_toggled.emit(option, is_enabled)
+		self.sig_flags_changed.emit(self._flags)
+	
+	def flags(self) -> enum.Flag:
+
+		return self._flags
+	
+	def setFlags(self, options:enum.Flag):
+		"""Set all options from a given flags enum"""
+
+		if not isinstance(options, type(self._flags)):
+			raise TypeError(f"Flags must be type {type(self._flags).__name__} (not ({type(options).__name__}))")
+		
+		self._flags = options
+		
+		self.updateCheckStates()
+	
+	def updateCheckStates(self):
+		"""Update the check states"""
+
+		for option, chk in self._option_mappings.items():
+			chk.setCheckState(QtCore.Qt.CheckState.Checked if bool(self._flags & option) else QtCore.Qt.CheckState.Unchecked)
+		
+
+
+class BinDisplayItemTypesView(AbstractEnumFlagsView):
 
 	def __init__(self, *args, **kwargs):
 
 		super().__init__(*args, **kwargs)
-
+		
 		self.setLayout(QtWidgets.QVBoxLayout())
 		self.layout().setSpacing(0)
 		self.layout().setContentsMargins(0,0,0,0)
 
-		self._option_mappings:dict[avbutils.BinDisplayItemTypes, QtWidgets.QCheckBox] = dict()
+		grp_clips = QtWidgets.QGroupBox()
 
-		for option in avbutils.BinDisplayItemTypes:
+		grp_clips.setLayout(QtWidgets.QVBoxLayout())
+		grp_clips.layout().setSpacing(0)
+		grp_clips.layout().setContentsMargins(3,0,3,0)
 
-			chk_option = QtWidgets.QCheckBox(text=option.name.replace("_"," ").title())
-			chk_option.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
-			self._option_mappings[option] = chk_option
-			self.layout().addWidget(chk_option)
-		self.layout().addStretch()
+		chk = self._option_mappings[avbutils.BinDisplayItemTypes.MASTER_CLIP]
+		chk.setText("Master Clips")
+		grp_clips.layout().addWidget(chk)
+
+		chk = self._option_mappings[avbutils.BinDisplayItemTypes.LINKED_MASTER_CLIP]
+		chk.setText("Linked Master Clips")
+		grp_clips.layout().addWidget(chk)
+
+		chk = self._option_mappings[avbutils.BinDisplayItemTypes.SUBCLIP]
+		chk.setText("Subclips")
+		grp_clips.layout().addWidget(chk)
+
+		chk = self._option_mappings[avbutils.BinDisplayItemTypes.SEQUENCE]
+		chk.setText("Sequences")
+		grp_clips.layout().addWidget(chk)
+
+		chk = self._option_mappings[avbutils.BinDisplayItemTypes.SOURCE]
+		chk.setText("Sources")
+		grp_clips.layout().addWidget(chk)
+
+		chk = self._option_mappings[avbutils.BinDisplayItemTypes.EFFECT]
+		chk.setText("Effects")
+		grp_clips.layout().addWidget(chk)
+
+		chk = self._option_mappings[avbutils.BinDisplayItemTypes.MOTION_EFFECT]
+		chk.setText("Motion Effects")
+		grp_clips.layout().addWidget(chk)
+
+		chk = self._option_mappings[avbutils.BinDisplayItemTypes.PRECOMP_RENDERED_EFFECT]
+		chk.setText("Precompute Clips - Rendered Effects")
+		grp_clips.layout().addWidget(chk)
+
+		chk = self._option_mappings[avbutils.BinDisplayItemTypes.PRECOMP_TITLE_MATTEKEY]
+		chk.setText("Precompute Clips - Titles and Matte Keys")
+		grp_clips.layout().addWidget(chk)
+
+		chk = self._option_mappings[avbutils.BinDisplayItemTypes.GROUP]
+		chk.setText("Groups")
+		grp_clips.layout().addWidget(chk)
+
+		chk = self._option_mappings[avbutils.BinDisplayItemTypes.STEREOSCOPIC_CLIP]
+		chk.setText("Stereoscopic Clips")
+		grp_clips.layout().addWidget(chk)
+
+		self.layout().addWidget(grp_clips)
+
+		grp_origins = QtWidgets.QGroupBox()
+		grp_origins.setLayout(QtWidgets.QVBoxLayout())
+		grp_origins.layout().setSpacing(0)
+		grp_origins.layout().setContentsMargins(3,0,3,0)
+
+		chk = self._option_mappings[avbutils.BinDisplayItemTypes.USER_CLIP]
+		chk.setText("Show clips created by user")
+		grp_origins.layout().addWidget(chk)
 		
-	@QtCore.Slot(QtCore.Qt.CheckState)
-	def what(self, state:QtCore.Qt.CheckState):
-		print(state)
-	
-	@QtCore.Slot(object)
-	def _optionToggled(self, option:avbutils.BinDisplayItemTypes):
-		print(option)
-	
-	def setOptions(self, options:avbutils.BinDisplayItemTypes):
-		"""Set all options from a given `avbutils.BinDisplayItemTypes` enum"""
+		chk = self._option_mappings[avbutils.BinDisplayItemTypes.REFERENCE_CLIP]
+		chk.setText("Show reference clips")
+		grp_origins.layout().addWidget(chk)
+		
 
-		for option in self._option_mappings:
-			self.setOption(option, option in options)
-	
-	def setOption(self, option:avbutils.BinDisplayItemTypes, is_enabled:bool):
-		"""Toggle a single option"""
+		self.layout().addWidget(grp_origins)
 
-		if not len(option) == 1:
-			raise ValueError("Only one option is allowed.  Use setOptions() for multiple flags.")
-
-		self._option_mappings[option].setChecked(is_enabled)
+		self.layout().addStretch()
 
 class BinSiftSettingsView(QtWidgets.QWidget):
 
@@ -153,7 +247,7 @@ class BinAppearanceSettingsView(QtWidgets.QWidget):
 
 	@QtCore.Slot(bool)
 	def setWasIconic(self, was_iconic:bool):
-		print(was_iconic)
+		#print(was_iconic)
 		self._chk_was_iconic.setChecked(was_iconic)
 
 	# TODO I'm sure this can be one method
@@ -177,7 +271,7 @@ class BinAppearanceSettingsView(QtWidgets.QWidget):
 	
 	@QtCore.Slot(QtCore.QRect)
 	def setBinRect(self, rect:QtCore.QRect):
-		print(rect)
+		#print(rect)
 		
 		self._spn_geo_x.setValue(rect.x())
 		self._spn_geo_y.setValue(rect.y())
@@ -700,7 +794,7 @@ class MainApplication(QtWidgets.QApplication):
 		self._btn_open.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.FolderOpen))
 		self._btn_open.clicked.connect(self.browseForBin)
 
-		self._view_BinDisplayItemTypes = BinDisplayItemTypesView()
+		self._view_BinDisplayItemTypes = BinDisplayItemTypesView(avbutils.BinDisplayItemTypes.default_items())
 		
 		self._view_BinAppearanceSettings = BinAppearanceSettingsView()
 		self._view_BinAppearanceSettings._tree_column_widths.model().setSourceModel(self._appearance_presenter.viewModel())
@@ -725,6 +819,9 @@ class MainApplication(QtWidgets.QApplication):
 
 		self._tree_bin_contents = BinTreeView()
 		self._tree_bin_contents.model().setSourceModel(self._contents_presenter.viewModel())
+
+		self._view_BinDisplayItemTypes.sig_flags_changed.connect(self._tree_bin_contents.setBinDisplayItemTypes)
+
 		self._tree_bin_contents.setItemDelegateForColumn(0, delegates.LBClipColorItemDelegate())
 		self._appearance_presenter.sig_font_changed.connect(self._tree_bin_contents.setFont)
 		self._appearance_presenter.sig_palette_changed.connect(self._set_tree_palette)
@@ -745,6 +842,9 @@ class MainApplication(QtWidgets.QApplication):
 		dock_displayoptions = QtWidgets.QDockWidget("Bin Display Settings")
 		dock_displayoptions.setFont(dock_font)
 		dock_displayoptions.setWidget(QtWidgets.QScrollArea())
+		dock_displayoptions.widget().setWidgetResizable(True)
+		dock_displayoptions.widget().setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+		dock_displayoptions.widget().setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 		dock_displayoptions.widget().setWidget(self._view_BinDisplayItemTypes)
 
 		dock_appearance = QtWidgets.QDockWidget("Bin Appearance Settings")
@@ -868,7 +968,7 @@ class MainApplication(QtWidgets.QApplication):
 		self._worker.signals().sig_begin_loading.connect(lambda: self._wnd_main.setWindowFilePath(bin_path))
 		self._worker.signals().sig_begin_loading.connect(self._prog_loading.show)
 
-		self._worker.signals().sig_got_display_options.connect(self._view_BinDisplayItemTypes.setOptions)
+		self._worker.signals().sig_got_display_options.connect(self._view_BinDisplayItemTypes.setFlags)
 		self._worker.signals().sig_got_display_options.connect(self._tree_bin_contents.model().setBinDisplayItemTypes)
 
 		self._worker.signals().sig_got_bin_appearance_settings.connect(self._appearance_presenter.setAppearanceSettings)
