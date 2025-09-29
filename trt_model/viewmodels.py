@@ -25,14 +25,20 @@ class TRTSortFilterProxyModel(QtCore.QSortFilterProxyModel):
 		
 		BIN_TYPES_COLUMN = 1
 		
-		item_types = self.data(
-			self.index(source_row, BIN_TYPES_COLUMN, source_parent), QtCore.Qt.ItemDataRole.UserRole
-		)
+		src = self.mapToSource(self.index(source_row, BIN_TYPES_COLUMN, source_parent))
+		item_types = src.data(QtCore.Qt.ItemDataRole.UserRole)
+
 		
-		#if isinstance(item_types, avbutils.BinDisplayItemTypes):
-		#	print(source_row, item_types, avbutils.BinDisplayItemTypes.SHOW_CLIPS_CREATED_BY_USER in item_types)
-		#	return avbutils.BinDisplayItemTypes.SHOW_CLIPS_CREATED_BY_USER in item_types
-		#
+		
+		if isinstance(item_types, avbutils.BinDisplayItemTypes):
+			#print(source_row, item_types, avbutils.BinDisplayItemTypes.SHOW_CLIPS_CREATED_BY_USER in item_types)
+			#print(self._bin_display_items & item_types)
+			#print(f"{self._bin_display_items & item_types=}")
+			return bool(item_types in self._bin_display_items)
+		#else:
+			#print(self.headerData(section=BIN_TYPES_COLUMN, orientation=QtCore.Qt.Orientation.Horizontal, role=QtCore.Qt.ItemDataRole.DisplayRole))
+			#print(f"item_types is {item_types=}")
+		
 		return super().filterAcceptsRow(source_row, source_parent)
 		
 		
@@ -47,11 +53,12 @@ class TRTSortFilterProxyModel(QtCore.QSortFilterProxyModel):
 			source_right.data(self.sortRole())
 		) <= 0	# gt OR EQUAL TO reverses sort even if all thingies are equal, I like it
 	
+	@QtCore.Slot(object)
 	def setBinDisplayItemTypes(self, types:avbutils.BinDisplayItemTypes):
 
 		self._bin_display_items = types
+		#print(self.binDisplayItemTypes())
 		self.invalidateRowsFilter()
-		print(self.binDisplayItemTypes())
 	
 	def binDisplayItemTypes(self) -> avbutils.BinDisplayItemTypes:
 		return self._bin_display_items
