@@ -25,8 +25,8 @@ class TRTSortFilterProxyModel(QtCore.QSortFilterProxyModel):
 		
 		BIN_TYPES_COLUMN = 1
 		
-		src = self.mapToSource(self.index(source_row, BIN_TYPES_COLUMN, source_parent))
-		item_types = src.data(QtCore.Qt.ItemDataRole.UserRole)
+		src_index = self.sourceModel().index(source_row, BIN_TYPES_COLUMN, source_parent)
+		item_types = src_index.data(QtCore.Qt.ItemDataRole.UserRole)
 
 		
 		
@@ -57,7 +57,7 @@ class TRTSortFilterProxyModel(QtCore.QSortFilterProxyModel):
 	def setBinDisplayItemTypes(self, types:avbutils.BinDisplayItemTypes):
 
 		self._bin_display_items = types
-		#print(self.binDisplayItemTypes())
+		print(self.binDisplayItemTypes().__repr__())
 		self.invalidateRowsFilter()
 	
 	def binDisplayItemTypes(self) -> avbutils.BinDisplayItemTypes:
