@@ -19,6 +19,8 @@ class TRTSortFilterProxyModel(QtCore.QSortFilterProxyModel):
 
 		self._bin_display_items = avbutils.BinDisplayItemTypes(0)
 
+		self._search_text = ""
+
 		self.setSortRole(QtCore.Qt.ItemDataRole.InitialSortOrderRole)
 
 	def filterAcceptsRow(self, source_row:int, source_parent:QtCore.QModelIndex) -> bool:
@@ -35,9 +37,7 @@ class TRTSortFilterProxyModel(QtCore.QSortFilterProxyModel):
 		item_types = src_index.data(QtCore.Qt.ItemDataRole.UserRole)
 
 		
-		
 		if isinstance(item_types, avbutils.BinDisplayItemTypes):
-
 			return bool(item_types in self._bin_display_items)
 
 		
@@ -47,6 +47,13 @@ class TRTSortFilterProxyModel(QtCore.QSortFilterProxyModel):
 		
 		#print(item_types & self.binDisplayItemTypes())
 		#return bool(item_types & self.binDisplayItemTypes())
+
+	@QtCore.Slot(object)
+	def setSearchText(self, search_text:str):
+		"""Set the text filter"""
+
+		self._search_text = search_text
+		self.invalidateRowsFilter()
 
 	
 	def lessThan(self, source_left:QtCore.QModelIndex, source_right:QtCore.QModelIndex) -> bool:

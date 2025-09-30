@@ -8,6 +8,147 @@ import avb, avbutils, timecode
 from PySide6 import QtCore, QtGui, QtWidgets
 from trt_model import presenters, viewitems, viewmodels, delegates
 
+class BinContentsWidget(QtWidgets.QWidget):
+	"""Display bin contents and controls"""
+
+	sig_request_open_bin = QtCore.Signal()
+	sig_request_display_mode = QtCore.Signal(object)
+
+	def __init__(self, *args, **kwargs):
+
+		super().__init__(*args, **kwargs)
+
+		self.setAutoFillBackground(True)
+
+		self.setLayout(QtWidgets.QVBoxLayout())
+		
+		#self.setContentsMargins(0,0,0,0)
+		self.layout().setContentsMargins(0,0,0,0)
+		self.layout().setSpacing(0)
+
+		self._section_top       = QtWidgets.QToolBar()
+		self._tree_bin_contents = BinTreeView()
+		self._section_bottom    = QtWidgets.QWidget()
+
+		self.layout().addWidget(self._section_top)
+		self.layout().addWidget(self._tree_bin_contents)
+		self.layout().addWidget(self._section_bottom)
+
+		#self._section_top.setLayout(QtWidgets.QHBoxLayout())
+		#self._section_top.layout().setContentsMargins(0,0,0,0)
+		#self._section_top.layout().setSpacing(0)
+
+		toolbar_font = self._section_top.font()
+		toolbar_font.setPointSizeF(toolbar_font.pointSizeF() * 0.8)
+		self._section_top.setFont(toolbar_font)
+		self._section_bottom.setFont(toolbar_font)
+
+		self._cmb_bin_view_list = QtWidgets.QComboBox()
+
+		self._btngrp_view_modes = QtWidgets.QButtonGroup()
+		self._btngrp_view_modes.idClicked.connect(lambda id: self.sig_request_display_mode.emit(avbutils.BinDisplayModes(id)))
+		self.sig_request_display_mode.connect(lambda d: print(d.name))
+
+		self._btn_view_list = QtWidgets.QPushButton()
+		self._btn_view_list.setCheckable(True)
+		self._btn_view_list.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.FormatTextDirectionLtr))
+
+		self._btn_view_script = QtWidgets.QPushButton()
+		self._btn_view_script.setCheckable(True)
+		self._btn_view_script.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.DocumentProperties))
+
+		self._btn_view_frame = QtWidgets.QPushButton()
+		self._btn_view_frame.setCheckable(True)
+		self._btn_view_frame.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.CameraPhoto))
+
+		self._btngrp_view_modes.addButton(self._btn_view_list)
+		self._btngrp_view_modes.setId(self._btn_view_list, avbutils.BinDisplayModes.LIST.value)
+		self._btngrp_view_modes.addButton(self._btn_view_script)
+		self._btngrp_view_modes.setId(self._btn_view_script, avbutils.BinDisplayModes.SCRIPT.value)
+		self._btngrp_view_modes.addButton(self._btn_view_frame)
+		self._btngrp_view_modes.setId(self._btn_view_frame, avbutils.BinDisplayModes.FRAME.value)
+
+		self._btn_request_open = QtWidgets.QPushButton("&Open Bin...")
+		self._btn_request_open.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.DocumentOpen))
+		self._btn_request_open.clicked.connect(self.sig_request_open_bin)
+		
+		self._section_top.addWidget(self._btn_request_open)
+		
+		sep = QtWidgets.QWidget()
+		sep.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+		self._section_top.addWidget(sep)
+		self._section_top.addWidget(self._cmb_bin_view_list)
+		self._section_top.addWidget(self._btn_view_list)
+		self._section_top.addWidget(self._btn_view_script)
+		self._section_top.addWidget(self._btn_view_frame)
+
+		self._section_bottom.setLayout(QtWidgets.QHBoxLayout())
+		self._section_bottom.layout().setContentsMargins(2,2,2,2)
+		
+		self._txt_search = QtWidgets.QLineEdit()
+		self._txt_search.setFixedWidth(self.fontMetrics().averageCharWidth() * 20)
+		self._txt_search.setPlaceholderText("Find bin bin...")
+		self._txt_search.textEdited.connect(print)
+		self._txt_search.setClearButtonEnabled(True)
+
+		self._lbl_bin_item_count = QtWidgets.QLabel()
+		self._section_bottom.layout().addWidget(self._txt_search)
+		self._section_bottom.layout().addStretch()
+		self._section_bottom.layout().addWidget(self._lbl_bin_item_count)
+
+		self._tree_bin_contents.model().rowsInserted.connect(self.updateBinStats)
+		self._tree_bin_contents.model().rowsRemoved.connect(self.updateBinStats)
+		self._tree_bin_contents.model().modelReset.connect(self.updateBinStats)
+		
+		# Source model isn't necessarily set at this point
+		self._tree_bin_contents.model().sourceModelChanged.connect(self._tree_bin_contents.model().setSearchText)
+
+	def treeView(self) -> "BinTreeView":
+		"""Get the main view"""
+		return self._tree_bin_contents
+	
+	def setTreeView(self, treeview:"BinTreeView"):
+		self._tree_bin_contents = treeview
+	
+	def topSectionWidget(self) -> QtWidgets.QWidget:
+		return self._section_top
+	
+	def setTopSectionWidget(self, widget:QtWidgets.QWidget):
+		self._section_top = widget
+	
+	def bottomSectionWidget(self) -> QtWidgets.QWidget:
+		return self._section_bottom
+	
+	def setBottomSectionWidget(self, widget:QtWidgets.QWidget):
+		self._section_bottom = widget
+	
+	@QtCore.Slot(object)
+	def setDisplayMode(self, mode:avbutils.BinDisplayModes):
+		self._btngrp_view_modes.button(mode.value).setChecked(True)
+
+	@QtCore.Slot()
+	def _connectSourceModelSlots(self):
+
+		source_model = self._tree_bin_contents.model().sourceModel()
+
+		if not source_model:
+			return
+		
+		source_model.rowsInserted.connect(self.updateBinStats)
+		source_model.rowsRemoved.connect(self.updateBinStats)
+		source_model.modelReset.connect(self.updateBinStats)
+
+	@QtCore.Slot()
+	def updateBinStats(self):
+
+		#print("HI")
+
+		count_visible = self._tree_bin_contents.model().rowCount()
+		count_all = self._tree_bin_contents.model().sourceModel().rowCount()
+		self._lbl_bin_item_count.setText(f"Showing {count_visible} of {count_all} items")
+	
+
+
 class AbstractEnumFlagsView(QtWidgets.QWidget):
 
 	sig_flag_toggled  = QtCore.Signal(object, bool)
@@ -601,6 +742,7 @@ class BinViewLoader(QtCore.QRunnable):
 	class Signals(QtCore.QObject):
 
 		sig_begin_loading = QtCore.Signal()
+		sig_got_display_mode = QtCore.Signal(object)
 		sig_got_bin_appearance_settings = QtCore.Signal(object, object, object, object, object, object, object)
 		sig_got_display_options = QtCore.Signal(object)
 		sig_got_view_settings = QtCore.Signal(object)
@@ -621,6 +763,7 @@ class BinViewLoader(QtCore.QRunnable):
 			
 			self._loadBinDisplayItemTypes(bin_handle.content)
 			self._loadBinView(bin_handle.content)
+			self._loadBinDisplayMode(bin_handle.content)
 			self._loadBinSiftSettings(bin_handle.content.sifted, bin_handle.content.sifted_settings)
 			self._loadBinSorting(bin_handle.content.sort_columns)
 			self._loadBinAppearanceSettings(bin_handle.content)
@@ -632,6 +775,11 @@ class BinViewLoader(QtCore.QRunnable):
 					print(f"{e} {bin_item.mob}")
 		
 		self._signals.sig_done_loading.emit()
+
+	def _loadBinDisplayMode(self, bin_content:avb.bin.Bin):
+		"""Load the display mode"""
+
+		self.signals().sig_got_display_mode.emit(avbutils.BinDisplayModes.get_mode_from_bin(bin_content))
 
 	def _loadBinAppearanceSettings(self, bin_content:avb.bin.Bin):
 		"""General and misc appearance settings stored around the bin"""
@@ -827,11 +975,15 @@ class MainApplication(QtWidgets.QApplication):
 		self._tree_property_data = BinTreeView()
 		self._tree_property_data.model().setSourceModel(self._prop_data_presenter.viewModel())
 
-		self._tree_bin_contents = BinTreeView()
+		self._main_bin_contents = BinContentsWidget()
+
+		self._main_bin_contents.sig_request_open_bin.connect(self.browseForBin)
+		
+		self._tree_bin_contents = self._main_bin_contents.treeView()
 		self._tree_bin_contents.model().setSourceModel(self._contents_presenter.viewModel())
 
 		self._view_BinDisplayItemTypes.sig_flags_changed.connect(self._tree_bin_contents.setBinDisplayItemTypes)
-
+		
 		self._tree_bin_contents.setItemDelegateForColumn(0, delegates.LBClipColorItemDelegate())
 		self._appearance_presenter.sig_font_changed.connect(self._tree_bin_contents.setFont)
 		self._appearance_presenter.sig_palette_changed.connect(self._set_tree_palette)
@@ -841,8 +993,9 @@ class MainApplication(QtWidgets.QApplication):
 		self._tree_sort_properties.model().setSourceModel(self._sorting_presenter.viewModel())
 
 		self._wnd_main = QtWidgets.QMainWindow()
+		self._wnd_main.setDocumentMode(True)
 		self._wnd_main.resize(1024, 600)
-		self._wnd_main.setCentralWidget(self._tree_bin_contents)
+		self._wnd_main.setCentralWidget(self._main_bin_contents)
 		self._appearance_presenter.sig_window_rect_changed.connect(self._view_BinAppearanceSettings.setBinRect)
 
 
@@ -899,13 +1052,17 @@ class MainApplication(QtWidgets.QApplication):
 		VARIATION     = 110  # Must be >100 to  have effect
 		VARIATION_MID = 105  # Must be >100 to  have effect
 
-		palette = self._tree_bin_contents.palette()
+		palette = self._main_bin_contents.palette()
 
 		palette.setColor(QtGui.QPalette.ColorRole.Text, fg)
 		palette.setColor(QtGui.QPalette.ColorRole.ButtonText, fg)
 		palette.setColor(QtGui.QPalette.ColorRole.Base, bg)
 		palette.setColor(QtGui.QPalette.ColorRole.AlternateBase, bg.darker(VARIATION))
 		palette.setColor(QtGui.QPalette.ColorRole.Button, bg.darker(VARIATION))
+
+		palette.setColor(QtGui.QPalette.ColorRole.Window, bg.darker(VARIATION).darker(VARIATION))
+		palette.setColor(QtGui.QPalette.ColorRole.WindowText, fg)
+		palette.setColor(QtGui.QPalette.ColorRole.PlaceholderText, bg.lighter(VARIATION).lighter(VARIATION).lighter(VARIATION))
 
 
 		# Fusion scrollbar uses these colors per https://doc.qt.io/qtforpython-6/PySide6/QtGui/QPalette.html
@@ -915,7 +1072,7 @@ class MainApplication(QtWidgets.QApplication):
 		palette.setColor(QtGui.QPalette.ColorRole.Mid,      palette.color(QtGui.QPalette.ColorRole.Button).darker(VARIATION_MID))   # Between Button and Dark
 		palette.setColor(QtGui.QPalette.ColorRole.Dark,     palette.color(QtGui.QPalette.ColorRole.Button).darker(VARIATION))       # Darker than Button
 		
-		self._tree_bin_contents.setPalette(palette)
+		self._main_bin_contents.setPalette(palette)
 
 	@QtCore.Slot(QtCore.QModelIndex)
 	def focusBinColumn(self, index:QtCore.QModelIndex):
@@ -983,6 +1140,8 @@ class MainApplication(QtWidgets.QApplication):
 
 		self._worker.signals().sig_got_display_options.connect(self._view_BinDisplayItemTypes.setFlags)
 		self._worker.signals().sig_got_display_options.connect(self._tree_bin_contents.model().setBinDisplayItemTypes)
+
+		self._worker.signals().sig_got_display_mode.connect(self._main_bin_contents.setDisplayMode)
 
 		self._worker.signals().sig_got_bin_appearance_settings.connect(self._appearance_presenter.setAppearanceSettings)
 		
