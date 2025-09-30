@@ -101,7 +101,7 @@ class BinContentsWidget(QtWidgets.QWidget):
 		self._tree_bin_contents.model().modelReset.connect(self.updateBinStats)
 		
 		# Source model isn't necessarily set at this point
-		self._tree_bin_contents.model().sourceModelChanged.connect(self._tree_bin_contents.model().setSearchText)
+		#self._tree_bin_contents.model().sourceModelChanged.connect(self._tree_bin_contents.model().setSearchText)
 
 	def treeView(self) -> "BinTreeView":
 		"""Get the main view"""
