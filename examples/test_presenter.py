@@ -896,21 +896,24 @@ class MainApplication(QtWidgets.QApplication):
 	@QtCore.Slot(QtGui.QColor, QtGui.QColor)
 	def _set_tree_palette(self, fg:QtGui.QColor, bg:QtGui.QColor):
 
+		VARIATION     = 110  # Must be >100 to  have effect
+		VARIATION_MID = 105  # Must be >100 to  have effect
+
 		palette = self._tree_bin_contents.palette()
 
 		palette.setColor(QtGui.QPalette.ColorRole.Text, fg)
 		palette.setColor(QtGui.QPalette.ColorRole.ButtonText, fg)
 		palette.setColor(QtGui.QPalette.ColorRole.Base, bg)
-		palette.setColor(QtGui.QPalette.ColorRole.AlternateBase, bg.darker(125))
-		palette.setColor(QtGui.QPalette.ColorRole.Button, bg.darker(125))
+		palette.setColor(QtGui.QPalette.ColorRole.AlternateBase, bg.darker(VARIATION))
+		palette.setColor(QtGui.QPalette.ColorRole.Button, bg.darker(VARIATION))
 
 
 		# Fusion scrollbar uses these colors per https://doc.qt.io/qtforpython-6/PySide6/QtGui/QPalette.html
 		# Although it... like... doesn't? lol
-		palette.setColor(QtGui.QPalette.ColorRole.Light,    palette.color(QtGui.QPalette.ColorRole.Button).lighter(125))   # Lighter than Button color
-		palette.setColor(QtGui.QPalette.ColorRole.Midlight, palette.color(QtGui.QPalette.ColorRole.Button).lighter(75))    # Between Button and Light
-		palette.setColor(QtGui.QPalette.ColorRole.Mid,      palette.color(QtGui.QPalette.ColorRole.Button).darker(75))     # Between Button and Dark
-		palette.setColor(QtGui.QPalette.ColorRole.Dark,     palette.color(QtGui.QPalette.ColorRole.Button).darker(125))    # Darker than Button
+		palette.setColor(QtGui.QPalette.ColorRole.Light,    palette.color(QtGui.QPalette.ColorRole.Button).lighter(VARIATION))      # Lighter than Button color
+		palette.setColor(QtGui.QPalette.ColorRole.Midlight, palette.color(QtGui.QPalette.ColorRole.Button).lighter(VARIATION_MID))  # Between Button and Light
+		palette.setColor(QtGui.QPalette.ColorRole.Mid,      palette.color(QtGui.QPalette.ColorRole.Button).darker(VARIATION_MID))   # Between Button and Dark
+		palette.setColor(QtGui.QPalette.ColorRole.Dark,     palette.color(QtGui.QPalette.ColorRole.Button).darker(VARIATION))       # Darker than Button
 		
 		self._tree_bin_contents.setPalette(palette)
 
