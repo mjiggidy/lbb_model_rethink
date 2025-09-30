@@ -23,21 +23,23 @@ class TRTSortFilterProxyModel(QtCore.QSortFilterProxyModel):
 
 	def filterAcceptsRow(self, source_row:int, source_parent:QtCore.QModelIndex) -> bool:
 		
-		BIN_TYPES_COLUMN = 1
+		try:
+			item_type_header_index = next(c
+				for c in range(self.sourceModel().columnCount(source_parent))
+				if self.sourceModel().headerData(c, QtCore.Qt.Orientation.Horizontal, role=QtCore.Qt.ItemDataRole.UserRole+1) == 200
+			)
+		except StopIteration:
+			return super().filterAcceptsRow(source_row, source_parent)
 		
-		src_index = self.sourceModel().index(source_row, BIN_TYPES_COLUMN, source_parent)
+		src_index = self.sourceModel().index(source_row, item_type_header_index, source_parent)
 		item_types = src_index.data(QtCore.Qt.ItemDataRole.UserRole)
 
 		
 		
 		if isinstance(item_types, avbutils.BinDisplayItemTypes):
-			#print(source_row, item_types, avbutils.BinDisplayItemTypes.SHOW_CLIPS_CREATED_BY_USER in item_types)
-			#print(self._bin_display_items & item_types)
-			#print(f"{self._bin_display_items & item_types=}")
+
 			return bool(item_types in self._bin_display_items)
-		#else:
-			#print(self.headerData(section=BIN_TYPES_COLUMN, orientation=QtCore.Qt.Orientation.Horizontal, role=QtCore.Qt.ItemDataRole.DisplayRole))
-			#print(f"item_types is {item_types=}")
+
 		
 		return super().filterAcceptsRow(source_row, source_parent)
 		
@@ -80,12 +82,12 @@ class TRTTimelineViewModel(QtCore.QAbstractItemModel):
 	def parent(self, /, child:QtCore.QModelIndex) -> QtCore.QModelIndex:
 		return QtCore.QModelIndex()
 	
-	def rowCount(self, /, parent:QtCore.QModelIndex) -> int:
+	def rowCount(self, /, parent:QtCore.QModelIndex=QtCore.QModelIndex()) -> int:
 		if parent.isValid():
 			return 0
 		return len(self._timelines)
 	
-	def columnCount(self, /, parent:QtCore.QModelIndex) -> int:
+	def columnCount(self, /, parent:QtCore.QModelIndex=QtCore.QModelIndex()) -> int:
 		if parent.isValid():
 			return 0
 		return len(self._headers)

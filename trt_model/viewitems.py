@@ -12,10 +12,12 @@ from functools import singledispatch
 class TRTAbstractViewHeaderItem:
 	"""An abstract header item for TRT views"""
 
-	def __init__(self, field_name:str, display_name:str, icon:QtGui.QIcon|None=None, item_factory:typing.Type["TRTAbstractViewItem"]|None=None, delegate:QtWidgets.QStyledItemDelegate|None=None):
+	def __init__(self, field_name:str, display_name:str, field_id:int=0, icon:QtGui.QIcon|None=None, item_factory:typing.Type["TRTAbstractViewItem"]|None=None, delegate:QtWidgets.QStyledItemDelegate|None=None):
 
 		self._field_name = field_name
+		self._field_id   = field_id # Think I wanna do this for bin headings
 		self._display_name = display_name
+
 
 		self._item_factory = item_factory
 		self._icon = icon
@@ -32,6 +34,7 @@ class TRTAbstractViewHeaderItem:
 			QtCore.Qt.ItemDataRole.DisplayRole: str(self._display_name),
 			QtCore.Qt.ItemDataRole.UserRole:    str(self._item_factory),
 			QtCore.Qt.ItemDataRole.DecorationRole: self._icon,
+			QtCore.Qt.ItemDataRole.UserRole+1:  self._field_id # Think I wanna do this for bin headings
 		 })
 	
 	def data(self, role:QtCore.Qt.ItemDataRole) -> typing.Any:

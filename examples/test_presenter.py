@@ -584,6 +584,7 @@ class BinContentsPresenter(presenters.LBItemDefinitionView):
 			self.addHeader(
 				viewitems.TRTAbstractViewHeaderItem(
 					field_name="40_"+column["title"] if column["type"] == 40 else str(column["type"]),
+					field_id=column["type"],
 					display_name=column["title"]
 				)
 			)
@@ -729,7 +730,7 @@ class BinViewLoader(QtCore.QRunnable):
 						tc_component, offset = avbutils.resolve_base_component_from_component(tc_track.component, offset + source.start_time)
 						
 						if not isinstance(tc_component, avb.components.Timecode):
-							print("Hmm")
+							print("Hmm",tc_component)
 							continue
 						
 						timecode_range = timecode.TimecodeRange(
