@@ -44,6 +44,7 @@ class BinContentsWidget(QtWidgets.QWidget):
 		self._section_bottom.setFont(toolbar_font)
 
 		self._cmb_bin_view_list = QtWidgets.QComboBox()
+		self._cmb_bin_view_list.setSizePolicy(self._cmb_bin_view_list.sizePolicy().horizontalPolicy(), QtWidgets.QSizePolicy.Policy.MinimumExpanding)
 
 		self._btngrp_view_modes = QtWidgets.QButtonGroup()
 		self._btngrp_view_modes.idClicked.connect(lambda id: self.sig_request_display_mode.emit(avbutils.BinDisplayModes(id)))
@@ -96,12 +97,6 @@ class BinContentsWidget(QtWidgets.QWidget):
 		self._section_bottom.layout().addStretch()
 		self._section_bottom.layout().addWidget(self._lbl_bin_item_count)
 
-		self._tree_bin_contents.model().rowsInserted.connect(self.updateBinStats)
-		self._tree_bin_contents.model().rowsRemoved.connect(self.updateBinStats)
-		self._tree_bin_contents.model().modelReset.connect(self.updateBinStats)
-		
-		# Source model isn't necessarily set at this point
-		#self._tree_bin_contents.model().sourceModelChanged.connect(self._tree_bin_contents.model().setSearchText)
 
 	def treeView(self) -> "BinTreeView":
 		"""Get the main view"""
@@ -981,6 +976,14 @@ class MainApplication(QtWidgets.QApplication):
 		
 		self._tree_bin_contents = self._main_bin_contents.treeView()
 		self._tree_bin_contents.model().setSourceModel(self._contents_presenter.viewModel())
+
+		self._tree_bin_contents.model().rowsInserted.connect(self._main_bin_contents.updateBinStats)
+		self._tree_bin_contents.model().rowsRemoved.connect(self._main_bin_contents.updateBinStats)
+		self._tree_bin_contents.model().modelReset.connect(self._main_bin_contents.updateBinStats)
+		self._tree_bin_contents.model().sourceModel().rowsInserted.connect(self._main_bin_contents.updateBinStats)
+		self._tree_bin_contents.model().sourceModel().rowsRemoved.connect(self._main_bin_contents.updateBinStats)
+		self._tree_bin_contents.model().sourceModel().modelReset.connect(self._main_bin_contents.updateBinStats)
+
 
 		self._view_BinDisplayItemTypes.sig_flags_changed.connect(self._tree_bin_contents.setBinDisplayItemTypes)
 		
