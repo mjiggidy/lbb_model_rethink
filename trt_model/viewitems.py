@@ -32,8 +32,8 @@ class TRTAbstractViewHeaderItem:
 
 		self._data_roles.update({
 			QtCore.Qt.ItemDataRole.DisplayRole: str(self._display_name),
-			QtCore.Qt.ItemDataRole.UserRole:    str(self._item_factory),
 			QtCore.Qt.ItemDataRole.DecorationRole: self._icon,
+			QtCore.Qt.ItemDataRole.UserRole:    self,
 			QtCore.Qt.ItemDataRole.UserRole+1:  self._field_id # Think I wanna do this for bin headings
 		 })
 	
@@ -48,6 +48,9 @@ class TRTAbstractViewHeaderItem:
 	
 	def field_name(self) -> str:
 		return self._field_name
+	
+	def display_name(self) -> str:
+		return self._display_name
 	
 	def delegate(self) -> QtWidgets.QStyledItemDelegate:
 		return self._delgate
@@ -71,8 +74,11 @@ class TRTAbstractViewItem:
 			QtCore.Qt.ItemDataRole.ToolTipRole:          self._tooltip if self._tooltip is not None else repr(self._data),
 			QtCore.Qt.ItemDataRole.DecorationRole:       self._icon,
 			QtCore.Qt.ItemDataRole.InitialSortOrderRole: self.to_string(self._data),	# QCollator just compares strings
-			QtCore.Qt.ItemDataRole.UserRole:             self._data,
+			QtCore.Qt.ItemDataRole.UserRole:             self,
 		})
+	def raw_data(self) -> typing.Any:
+		"""Get the original data for this item in its original format"""
+		return self._data
 
 	def data(self, role:QtCore.Qt.ItemDataRole) -> typing.Any:
 		"""Get item data for a given role.  By default, returns the raw data as a string."""
@@ -138,7 +144,7 @@ class TRTNumericViewItem(TRTAbstractViewItem):
 		})
 	
 	def to_json(self) -> int:
-		return self.data(QtCore.Qt.ItemDataRole.UserRole)
+		return self.data(QtCore.Qt.ItemDataRole.UserRole) # NOTE to self: need to change this to access item's _data
 	
 	@classmethod
 	def to_string(cls, data):

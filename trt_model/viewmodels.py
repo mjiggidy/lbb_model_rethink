@@ -34,7 +34,7 @@ class TRTSortFilterProxyModel(QtCore.QSortFilterProxyModel):
 			return super().filterAcceptsRow(source_row, source_parent)
 		
 		src_index = self.sourceModel().index(source_row, item_type_header_index, source_parent)
-		item_types = src_index.data(QtCore.Qt.ItemDataRole.UserRole)
+		item_types = src_index.data(QtCore.Qt.ItemDataRole.UserRole).raw_data()
 
 		
 		if isinstance(item_types, avbutils.BinDisplayItemTypes):
