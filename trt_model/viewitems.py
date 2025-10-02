@@ -170,7 +170,7 @@ class TRTDateTimeViewItem(TRTAbstractViewItem):
 		
 		self._format_string = format_string
 		
-		super().__init__(QtCore.QDateTime.fromMSecsSinceEpoch(int(raw_data.timestamp() * 1000)).toLocalTime())
+		super().__init__(QtCore.QDateTime(raw_data).toLocalTime())
 	
 	def setFormatString(self, format_string:str):
 		"""Set the datetime formatting string used by strftime"""
