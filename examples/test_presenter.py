@@ -135,16 +135,9 @@ class BinContentsWidget(QtWidgets.QWidget):
 
 		self._section_bottom.setLayout(QtWidgets.QHBoxLayout())
 		self._section_bottom.layout().setContentsMargins(2,2,2,2)
-		
-		self._txt_search = QtWidgets.QLineEdit()
-		self._txt_search.setFixedWidth(self.fontMetrics().averageCharWidth() * 20)
-		self._txt_search.setPlaceholderText("Find bin bin...")
-		self._txt_search.textEdited.connect(print)
-		self._txt_search.setClearButtonEnabled(True)
 
-		self._lbl_bin_item_count = QtWidgets.QLabel()
-		self._section_bottom.layout().addWidget(self._txt_search)
 		self._section_bottom.layout().addStretch()
+		self._lbl_bin_item_count = QtWidgets.QLabel()
 		self._section_bottom.layout().addWidget(self._lbl_bin_item_count)
 
 
@@ -1065,14 +1058,26 @@ class MainApplication(QtWidgets.QApplication):
 		self._main_bin_contents.topSectionWidget().addWidget(sep)
 
 		self._cmb_bin_view_list = QtWidgets.QComboBox()
-		self._cmb_bin_view_list.setMinimumWidth(self._cmb_bin_view_list.fontMetrics().averageCharWidth()*16)
+		self._cmb_bin_view_list.setMinimumWidth(self._cmb_bin_view_list.fontMetrics().averageCharWidth()*20)
 		self._cmb_bin_view_list.setMaximumWidth(self._cmb_bin_view_list.fontMetrics().averageCharWidth()*32)
 		#self._cmb_bin_view_list.addItem("Current View")
 		self._main_bin_contents.topSectionWidget().addWidget(self._cmb_bin_view_list)
 
+		self._main_bin_contents.topSectionWidget().addSeparator()
+
 		self._main_bin_contents.topSectionWidget().addWidget(PushButtonAction(action=self._act_view_list, show_text=False))
 		self._main_bin_contents.topSectionWidget().addWidget(PushButtonAction(action=self._act_view_frame, show_text=False))
 		self._main_bin_contents.topSectionWidget().addWidget(PushButtonAction(action=self._act_view_script, show_text=False))
+
+		self._txt_search = QtWidgets.QLineEdit()
+		self._txt_search.setFixedWidth(self._txt_search.fontMetrics().averageCharWidth() * 20)
+		self._txt_search.setPlaceholderText("Find bin bin...")
+		self._txt_search.textEdited.connect(print)
+		self._txt_search.setClearButtonEnabled(True)
+
+		self._main_bin_contents.topSectionWidget().addSeparator()
+		
+		self._main_bin_contents.topSectionWidget().addWidget(self._txt_search)
 
 		self._main_bin_contents.sig_request_open_bin.connect(self.browseForBin)
 		
