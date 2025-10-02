@@ -1,5 +1,24 @@
 from PySide6 import QtCore, QtGui, QtWidgets
 
+class LBTimecodeItemDelegate(QtWidgets.QStyledItemDelegate):
+
+	def __init__(self, *args, **kwargs):
+		
+		super().__init__(*args, **kwargs)
+
+	def paint(self, painter:QtGui.QPainter, option:QtWidgets.QStyleOption, index:QtCore.QModelIndex):
+
+		painter.setBrush(QtGui.QColor("Black"))
+		painter.drawRect(option.rect)
+		
+		#return None
+		#return super(painter, option, index)
+
+	def sizeHint(self, option:QtWidgets.QStyleOption, index:QtCore.QModelIndex) -> QtCore.QSize:
+		return super().sizeHint(option, index) * 10
+		
+		#return super().paint(painter, option, index)
+
 class LBClipColorItemDelegate(QtWidgets.QStyledItemDelegate):
 
 	def __init__(self, *args, **kwargs):
