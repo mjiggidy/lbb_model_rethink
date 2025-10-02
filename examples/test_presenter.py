@@ -521,6 +521,10 @@ class BinAppearanceSettingsView(QtWidgets.QWidget):
 class BinTreeView(QtWidgets.QTreeView):
 	"""QTreeView but nicer"""
 
+	item_delegates = {
+		51: delegates.LBClipColorItemDelegate()
+	}
+
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 		
@@ -533,6 +537,25 @@ class BinTreeView(QtWidgets.QTreeView):
 
 		self.header().setFirstSectionMovable(True)
 		self.header().setDefaultAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+
+		self.model().columnsInserted.connect(self.assignDisplayDelegates)
+
+	@QtCore.Slot(object, int, int)
+	def assignDisplayDelegates(self, parent_index:QtCore.QModelIndex, start_col:int, end_col:int):
+
+		if parent_index.isValid():
+			return
+		
+		for col in range(start_col, end_col+1):
+
+			header_title  = self.model().headerData(col, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.DisplayRole)
+			header_format = self.model().headerData(col, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.UserRole+1)
+
+
+			
+			if delegate := self.item_delegates.get(header_format, None): # First time using the walrus!
+				self.setItemDelegateForColumn(col, delegate)
+			
 
 	def columnDisplayNames(self) -> list[str]:
 		"""Get all column display names, in order"""
@@ -1076,7 +1099,7 @@ class MainApplication(QtWidgets.QApplication):
 		self._txt_search.setClearButtonEnabled(True)
 
 		self._main_bin_contents.topSectionWidget().addSeparator()
-		
+
 		self._main_bin_contents.topSectionWidget().addWidget(self._txt_search)
 
 		self._main_bin_contents.sig_request_open_bin.connect(self.browseForBin)
@@ -1094,7 +1117,7 @@ class MainApplication(QtWidgets.QApplication):
 
 		self._view_BinDisplayItemTypes.sig_flags_changed.connect(self._tree_bin_contents.setBinDisplayItemTypes)
 		
-		self._tree_bin_contents.setItemDelegateForColumn(0, delegates.LBClipColorItemDelegate())
+		#self._tree_bin_contents.setItemDelegateForColumn(0, delegates.LBClipColorItemDelegate())
 		self._appearance_presenter.sig_font_changed.connect(self._tree_bin_contents.setFont)
 		self._appearance_presenter.sig_palette_changed.connect(self._set_tree_palette)
 		self._appearance_presenter.sig_column_widths_changed.connect(self._tree_bin_contents.setColumnWidths)
