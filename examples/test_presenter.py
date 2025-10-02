@@ -8,6 +8,56 @@ import avb, avbutils, timecode
 from PySide6 import QtCore, QtGui, QtWidgets
 from trt_model import presenters, viewitems, viewmodels, delegates
 
+class PushButtonAction(QtWidgets.QPushButton):
+	"""A QPushButton with Action support"""
+
+	def __init__(self, action:QtGui.QAction|None=None, show_text:bool=True, show_icon:bool=True, show_tooltip:bool=True, *args, **kwargs):
+
+		super().__init__(*args, **kwargs)
+
+		self._action = None
+		
+		self._show_text    = show_text
+		self._show_icon    = show_icon
+		self._show_tooltip = show_tooltip
+
+		if action:
+			self.setAction(action)
+	
+	def setAction(self, action:QtGui.QAction):
+
+		if self._action:
+
+			# Disconnect previous action
+			self._action.enabledChanged.disconnect(self.setEnabled)
+			self._action.visibleChanged.disconnect(self.setVisible)
+			self._action.checkableChanged.disconnect(self.setCheckable)
+			self._action.toggled.disconnect(self.setChecked)
+
+			self.clicked.disconnect(self._action.trigger)
+		
+		self._action = action
+
+		self.setEnabled(self._action.isEnabled())
+		self.setVisible(self._action.isVisible())
+		self.setCheckable(self._action.isCheckable())
+		self.setChecked(self._action.isChecked())
+
+		self.setIcon(self._action.icon() if self._show_icon else QtGui.QIcon())
+		self.setToolTip(self._action.toolTip() if self._show_tooltip else None)
+		self.setText(self._action.text() if self._show_text else None)
+
+		self._action.enabledChanged.connect(self.setEnabled)
+		self._action.visibleChanged.connect(self.setVisible)
+		self._action.checkableChanged.connect(self.setCheckable)
+		self._action.toggled.connect(self.setChecked)
+
+		self.clicked.connect(self._action.trigger)
+
+
+
+
+
 class BinContentsWidget(QtWidgets.QWidget):
 	"""Display bin contents and controls"""
 
@@ -43,45 +93,45 @@ class BinContentsWidget(QtWidgets.QWidget):
 		self._section_top.setFont(toolbar_font)
 		self._section_bottom.setFont(toolbar_font)
 
-		self._cmb_bin_view_list = QtWidgets.QComboBox()
-		self._cmb_bin_view_list.setSizePolicy(self._cmb_bin_view_list.sizePolicy().horizontalPolicy(), QtWidgets.QSizePolicy.Policy.MinimumExpanding)
-
-		self._btngrp_view_modes = QtWidgets.QButtonGroup()
-		self._btngrp_view_modes.idClicked.connect(lambda id: self.sig_request_display_mode.emit(avbutils.BinDisplayModes(id)))
-		self.sig_request_display_mode.connect(lambda d: print(d.name))
-
-		self._btn_view_list = QtWidgets.QPushButton()
-		self._btn_view_list.setCheckable(True)
-		self._btn_view_list.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.FormatTextDirectionLtr))
-
-		self._btn_view_script = QtWidgets.QPushButton()
-		self._btn_view_script.setCheckable(True)
-		self._btn_view_script.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.DocumentProperties))
-
-		self._btn_view_frame = QtWidgets.QPushButton()
-		self._btn_view_frame.setCheckable(True)
-		self._btn_view_frame.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.CameraPhoto))
-
-		self._btngrp_view_modes.addButton(self._btn_view_list)
-		self._btngrp_view_modes.setId(self._btn_view_list, avbutils.BinDisplayModes.LIST.value)
-		self._btngrp_view_modes.addButton(self._btn_view_script)
-		self._btngrp_view_modes.setId(self._btn_view_script, avbutils.BinDisplayModes.SCRIPT.value)
-		self._btngrp_view_modes.addButton(self._btn_view_frame)
-		self._btngrp_view_modes.setId(self._btn_view_frame, avbutils.BinDisplayModes.FRAME.value)
-
-		self._btn_request_open = QtWidgets.QPushButton("&Open Bin...")
-		self._btn_request_open.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.DocumentOpen))
-		self._btn_request_open.clicked.connect(self.sig_request_open_bin)
-		
-		self._section_top.addWidget(self._btn_request_open)
+		#self._cmb_bin_view_list = QtWidgets.QComboBox()
+		#self._cmb_bin_view_list.setSizePolicy(self._cmb_bin_view_list.sizePolicy().horizontalPolicy(), QtWidgets.QSizePolicy.Policy.MinimumExpanding)
+#
+		#self._btngrp_view_modes = QtWidgets.QButtonGroup()
+		#self._btngrp_view_modes.idClicked.connect(lambda id: self.sig_request_display_mode.emit(avbutils.BinDisplayModes(id)))
+		#self.sig_request_display_mode.connect(lambda d: print(d.name))
+#
+		#self._btn_view_list = QtWidgets.QPushButton()
+		#self._btn_view_list.setCheckable(True)
+		#self._btn_view_list.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.FormatTextDirectionLtr))
+#
+		#self._btn_view_script = QtWidgets.QPushButton()
+		#self._btn_view_script.setCheckable(True)
+		#self._btn_view_script.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.DocumentProperties))
+#
+		#self._btn_view_frame = QtWidgets.QPushButton()
+		#self._btn_view_frame.setCheckable(True)
+		#self._btn_view_frame.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.CameraPhoto))
+#
+		#self._btngrp_view_modes.addButton(self._btn_view_list)
+		#self._btngrp_view_modes.setId(self._btn_view_list, avbutils.BinDisplayModes.LIST.value)
+		#self._btngrp_view_modes.addButton(self._btn_view_script)
+		#self._btngrp_view_modes.setId(self._btn_view_script, avbutils.BinDisplayModes.SCRIPT.value)
+		#self._btngrp_view_modes.addButton(self._btn_view_frame)
+		#self._btngrp_view_modes.setId(self._btn_view_frame, avbutils.BinDisplayModes.FRAME.value)
+#
+		#self._btn_request_open = QtWidgets.QPushButton("&Open Bin...")
+		#self._btn_request_open.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.DocumentOpen))
+		#self._btn_request_open.clicked.connect(self.sig_request_open_bin)
+		#
+		#self._section_top.addWidget(self._btn_request_open)
 		
 		sep = QtWidgets.QWidget()
 		sep.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
-		self._section_top.addWidget(sep)
-		self._section_top.addWidget(self._cmb_bin_view_list)
-		self._section_top.addWidget(self._btn_view_list)
-		self._section_top.addWidget(self._btn_view_script)
-		self._section_top.addWidget(self._btn_view_frame)
+		#self._section_top.addWidget(sep)
+		#self._section_top.addWidget(self._cmb_bin_view_list)
+		#self._section_top.addWidget(self._btn_view_list)
+		#self._section_top.addWidget(self._btn_view_script)
+		#self._section_top.addWidget(self._btn_view_frame)
 
 		self._section_bottom.setLayout(QtWidgets.QHBoxLayout())
 		self._section_bottom.layout().setContentsMargins(2,2,2,2)
@@ -119,7 +169,8 @@ class BinContentsWidget(QtWidgets.QWidget):
 	
 	@QtCore.Slot(object)
 	def setDisplayMode(self, mode:avbutils.BinDisplayModes):
-		self._btngrp_view_modes.button(mode.value).setChecked(True)
+		pass
+		#self._btngrp_view_modes.button(mode.value).setChecked(True)
 
 	@QtCore.Slot()
 	def _connectSourceModelSlots(self):
@@ -140,7 +191,7 @@ class BinContentsWidget(QtWidgets.QWidget):
 
 		count_visible = self._tree_bin_contents.model().rowCount()
 		count_all = self._tree_bin_contents.model().sourceModel().rowCount()
-		self._lbl_bin_item_count.setText(f"Showing {count_visible} of {count_all} items")
+		self._lbl_bin_item_count.setText(f"Showing {QtCore.QLocale.system().toString(count_visible)} of {QtCore.QLocale.system().toString(count_all)} items")
 	
 
 
@@ -926,7 +977,44 @@ class MainApplication(QtWidgets.QApplication):
 
 		super().__init__()
 
-		self._threadpool = QtCore.QThreadPool()
+		self._threadpool = QtCore.QThreadPool(self)
+
+		# Actions
+		self._act_open = QtGui.QAction("Open Bin...", self)
+		self._act_open.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.DocumentOpen))
+		self._act_open.setToolTip("Choose a bin to open")
+		self._act_open.setShortcut(QtGui.QKeySequence.StandardKey.Open)
+		self._act_open.triggered.connect(self.browseForBin)
+
+		self._act_quit = QtGui.QAction("Quit")
+		self._act_quit.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.ApplicationExit))
+		self._act_quit.setShortcut(QtGui.QKeySequence.StandardKey.Quit)
+		self._act_quit.setMenuRole(QtGui.QAction.MenuRole.QuitRole)
+		self._act_quit.triggered.connect(self.quit)
+
+		self._actgrp_file = QtGui.QActionGroup(self)
+		self._actgrp_file.addAction(self._act_open)
+		self._actgrp_file.addAction(self._act_quit)
+
+
+		self._act_view_list   = QtGui.QAction("List View", checkable=True, checked=True)
+		self._act_view_list.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.FormatJustifyFill))
+		self._act_view_list.setToolTip("Show items in list view mode")
+
+		self._act_view_frame  = QtGui.QAction("Frame View", checkable=True)
+		self._act_view_frame.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.Battery))
+		self._act_view_frame.setToolTip("Show items in frame view mode")
+
+		self._act_view_script = QtGui.QAction("Script View", checkable=True)
+		self._act_view_script.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.DocumentPrintPreview))
+		self._act_view_script.setToolTip("Show items in script view mode")
+
+		self._actgrp_view_mode = QtGui.QActionGroup(self)
+		self._actgrp_view_mode.setExclusive(True)
+		self._actgrp_view_mode.addAction(self._act_view_list)
+		self._actgrp_view_mode.addAction(self._act_view_frame)
+		self._actgrp_view_mode.addAction(self._act_view_script)
+
 
 		self._prog_loading = QtWidgets.QProgressBar()
 		self._prog_loading.setWindowModality(QtCore.Qt.WindowModality.ApplicationModal)
@@ -971,6 +1059,20 @@ class MainApplication(QtWidgets.QApplication):
 		self._tree_property_data.model().setSourceModel(self._prop_data_presenter.viewModel())
 
 		self._main_bin_contents = BinContentsWidget()
+		self._main_bin_contents.topSectionWidget().addWidget(PushButtonAction(action=self._act_open))
+		sep = QtWidgets.QWidget()
+		sep.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+		self._main_bin_contents.topSectionWidget().addWidget(sep)
+
+		self._cmb_bin_view_list = QtWidgets.QComboBox()
+		self._cmb_bin_view_list.setMinimumWidth(self._cmb_bin_view_list.fontMetrics().averageCharWidth()*16)
+		self._cmb_bin_view_list.setMaximumWidth(self._cmb_bin_view_list.fontMetrics().averageCharWidth()*32)
+		#self._cmb_bin_view_list.addItem("Current View")
+		self._main_bin_contents.topSectionWidget().addWidget(self._cmb_bin_view_list)
+
+		self._main_bin_contents.topSectionWidget().addWidget(PushButtonAction(action=self._act_view_list, show_text=False))
+		self._main_bin_contents.topSectionWidget().addWidget(PushButtonAction(action=self._act_view_frame, show_text=False))
+		self._main_bin_contents.topSectionWidget().addWidget(PushButtonAction(action=self._act_view_script, show_text=False))
 
 		self._main_bin_contents.sig_request_open_bin.connect(self.browseForBin)
 		
@@ -995,12 +1097,24 @@ class MainApplication(QtWidgets.QApplication):
 		self._tree_sort_properties = BinTreeView()
 		self._tree_sort_properties.model().setSourceModel(self._sorting_presenter.viewModel())
 
+		# Main Window Setup
 		self._wnd_main = QtWidgets.QMainWindow()
-		self._wnd_main.setDocumentMode(True)
 		self._wnd_main.resize(1024, 600)
 		self._wnd_main.setCentralWidget(self._main_bin_contents)
-		self._appearance_presenter.sig_window_rect_changed.connect(self._view_BinAppearanceSettings.setBinRect)
 
+		self._mnu_file = QtWidgets.QMenu("&File")
+		self._mnu_file.addAction(self._act_open)
+		self._mnu_file.addAction(self._act_quit)
+
+		self._mnu_view = QtWidgets.QMenu("&View")
+		self._mnu_view.addAction(self._act_view_list)
+		self._mnu_view.addAction(self._act_view_frame)
+		self._mnu_view.addAction(self._act_view_script)
+
+		self._wnd_main.menuBar().addMenu(self._mnu_file)
+		self._wnd_main.menuBar().addMenu(self._mnu_view)
+
+		self._appearance_presenter.sig_window_rect_changed.connect(self._view_BinAppearanceSettings.setBinRect)
 
 		dock_font = QtWidgets.QDockWidget().font()
 		dock_font.setPointSizeF(dock_font.pointSizeF() * 0.8)
@@ -1154,6 +1268,8 @@ class MainApplication(QtWidgets.QApplication):
 		self._worker.signals().sig_got_view_settings.connect(self._col_defs_presenter.setBinView)
 		self._worker.signals().sig_got_view_settings.connect(self._prop_data_presenter.setBinView)
 		self._worker.signals().sig_got_view_settings.connect(self._contents_presenter.setBinView)
+		self._worker.signals().sig_got_view_settings.connect(lambda view: self._cmb_bin_view_list.insertItem(0,view.name))
+#		self._worker.signals().sig_got_view_settings.connect(self._main_bin_contents.setBinView)
 
 		self._worker.signals().sig_got_sift_settings.connect(self._sift_presenter.setSiftSettings)
 
