@@ -145,7 +145,7 @@ class TRTNumericViewItem(TRTAbstractViewItem):
 		self._data_roles.update({
 			QtCore.Qt.ItemDataRole.DisplayRole:          self.to_string(self._data),
 			#QtCore.Qt.ItemDataRole.InitialSortOrderRole: self._data,
-			QtCore.Qt.ItemDataRole.FontRole:             QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.SystemFont.FixedFont),
+			QtCore.Qt.ItemDataRole.FontRole:             QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.SystemFont.FixedFont).family(),
 		})
 	
 	def to_json(self) -> int:

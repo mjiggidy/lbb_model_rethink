@@ -7,17 +7,18 @@ class LBTimecodeItemDelegate(QtWidgets.QStyledItemDelegate):
 		super().__init__(*args, **kwargs)
 
 	def paint(self, painter:QtGui.QPainter, option:QtWidgets.QStyleOption, index:QtCore.QModelIndex):
-
-		painter.setBrush(QtGui.QColor("Black"))
-		painter.drawRect(option.rect)
 		
-		#return None
-		#return super(painter, option, index)
+		super().paint(painter, option, index)
 
-	def sizeHint(self, option:QtWidgets.QStyleOption, index:QtCore.QModelIndex) -> QtCore.QSize:
-		return super().sizeHint(option, index) * 10
+		painter.save()
+
+#		pen = QtGui.QPen(QtGui.QColor("Red"))
+#		pen.setStyle(QtCore.Qt.PenStyle.DotLine)
+#		painter.setPen(pen)
+#		painter.drawRect(option.rect)
 		
-		#return super().paint(painter, option, index)
+		painter.restore()
+
 
 class LBClipColorItemDelegate(QtWidgets.QStyledItemDelegate):
 
