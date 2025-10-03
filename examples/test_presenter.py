@@ -925,6 +925,7 @@ class BinViewLoader(QtCore.QRunnable):
 			source_file_name = None
 			timecode_range = None
 			user_attributes = dict()
+			source_drive = None
 
 			if avbutils.BinDisplayItemTypes.SEQUENCE in bin_item_role:
 				timecode_range = avbutils.get_timecode_range_for_composition(comp)
@@ -940,6 +941,17 @@ class BinViewLoader(QtCore.QRunnable):
 						source_file_name = avbutils.sourcerefs.physical_source_name_for_composition(comp)
 					else:
 						tape_name = avbutils.sourcerefs.physical_source_name_for_composition(comp)
+				
+				# Drive info
+				try:
+					# TODO: Do if comp itself is file source first, otherwise...
+					file_source_clip, offset = next(avbutils.file_references_for_component(avbutils.primary_track_for_composition(comp).component))
+				except StopIteration as e:
+					print("No file soruce:",comp)
+				else:
+					if isinstance(file_source_clip.mob.descriptor.locator, avb.misc.MSMLocator):
+						source_drive = file_source_clip.mob.descriptor.locator.last_known_volume
+						print(source_drive)
 				
 				# Timecode
 				# NOTE: This is all pretty sloppy here.
@@ -994,6 +1006,7 @@ class BinViewLoader(QtCore.QRunnable):
 				avbutils.BIN_COLUMN_ROLES["Marker"]: viewitems.TRTMarkerViewItem(markers[0]) if markers else None,
 				avbutils.BIN_COLUMN_ROLES["Tracks"]: avbutils.format_track_labels(list(avbutils.get_tracks_from_composition(comp))) or None,
 				avbutils.BIN_COLUMN_ROLES["Tape"]: tape_name or "",
+				avbutils.BIN_COLUMN_ROLES["Drive"]: source_drive or "",
 				avbutils.BIN_COLUMN_ROLES["Source File"]: source_file_name or "",
 				avbutils.BIN_COLUMN_ROLES["Scene"]: user_attributes.get("Scene") or "",
 				avbutils.BIN_COLUMN_ROLES["Take"]: user_attributes.get("Take") or "",
