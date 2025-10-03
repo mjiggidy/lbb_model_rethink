@@ -521,9 +521,16 @@ class BinAppearanceSettingsView(QtWidgets.QWidget):
 class BinTreeView(QtWidgets.QTreeView):
 	"""QTreeView but nicer"""
 
-	item_delegates = {
-		51: delegates.LBClipColorItemDelegate()
+	ITEM_DELEGATES_PER_FIELD_ID = {
+		51: delegates.LBClipColorItemDelegate(),
+
 	}
+	"""Specialized one-off fields"""
+
+	ITEM_DELEGATES_PER_FORMAT_ID = {
+		avbutils.BinColumnFormat.TIMECODE: delegates.LBTimecodeItemDelegate(),
+	}
+	"""Delegate for generic field formats"""
 
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
@@ -538,27 +545,42 @@ class BinTreeView(QtWidgets.QTreeView):
 		self.header().setFirstSectionMovable(True)
 		self.header().setDefaultAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
 
-		self.model().columnsInserted.connect(self.assignDisplayDelegates)
+		self.model().columnsInserted.connect(
+			lambda parent_index, source_start, source_end:
+			self.assignItemDelegates(parent_index, source_start)
+		)
+		self.model().columnsMoved.connect(
+			lambda source_parent, source_logical_start, source_logical_end, destination_parent, destination_logical_start:	# NOTE: Won't work for heirarchical models
+			self.assignItemDelegates(destination_parent, min(source_logical_start, destination_logical_start))
+		)
 
 	@QtCore.Slot(object, int, int)
-	def assignDisplayDelegates(self, parent_index:QtCore.QModelIndex, start_col:int, end_col:int):
+	def assignItemDelegates(self, parent_index:QtCore.QModelIndex, logical_start_column:int):
+		"""Assign item delegates starting with the first changed logical row, cascaded through to the end"""
 
 		if parent_index.isValid():
 			return
 		
-		for col in range(start_col, end_col+1):
-
-			header_title  = self.model().headerData(col, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.DisplayRole)
-			header_format = self.model().headerData(col, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.UserRole+1)
-
-
+		for col in range(logical_start_column, self.model().columnCount()):
 			
-			if delegate := self.item_delegates.get(header_format, None): # First time using the walrus!
-				self.setItemDelegateForColumn(col, delegate)
+			field_id     = self.model().headerData(col, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.UserRole+1)
+			format_id    = self.model().headerData(col, QtCore.Qt.Orientation.Horizontal, QtCore.Qt.ItemDataRole.UserRole+2)
+
+			item_delegate = self.itemDelegate()
+
+
+			# Look up specialized fields
+			if field_id in self.ITEM_DELEGATES_PER_FIELD_ID:
+				item_delegate = self.ITEM_DELEGATES_PER_FIELD_ID[field_id]
+			# Look up specialized generic formats
+			elif format_id in self.ITEM_DELEGATES_PER_FORMAT_ID:
+				item_delegate = self.ITEM_DELEGATES_PER_FORMAT_ID[format_id]
 			
+			self.setItemDelegateForColumn(col, item_delegate)
 
 	def columnDisplayNames(self) -> list[str]:
 		"""Get all column display names, in order"""
+		
 		return [
 			self.model().headerData(idx,
 				QtCore.Qt.Orientation.Horizontal,
@@ -788,7 +810,8 @@ class BinContentsPresenter(presenters.LBItemDefinitionView):
 				viewitems.TRTAbstractViewHeaderItem(
 					field_name="40_"+column["title"] if column["type"] == 40 else str(column["type"]),
 					field_id=column["type"],
-					display_name=column["title"]
+					format_id=column["format"],
+					display_name=column["title"],
 				)
 			)
 	
@@ -1018,11 +1041,11 @@ class MainApplication(QtWidgets.QApplication):
 		self._act_view_list.setToolTip("Show items in list view mode")
 
 		self._act_view_frame  = QtGui.QAction("Frame View", checkable=True)
-		self._act_view_frame.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.Battery))
+		self._act_view_frame.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.AudioCard))
 		self._act_view_frame.setToolTip("Show items in frame view mode")
 
 		self._act_view_script = QtGui.QAction("Script View", checkable=True)
-		self._act_view_script.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.DocumentPrintPreview))
+		self._act_view_script.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.ListAdd))
 		self._act_view_script.setToolTip("Show items in script view mode")
 
 		self._actgrp_view_mode = QtGui.QActionGroup(self)
