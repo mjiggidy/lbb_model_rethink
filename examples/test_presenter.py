@@ -943,15 +943,19 @@ class BinViewLoader(QtCore.QRunnable):
 						tape_name = avbutils.sourcerefs.physical_source_name_for_composition(comp)
 				
 				# Drive info
-				try:
-					# TODO: Do if comp itself is file source first, otherwise...
-					file_source_clip, offset = next(avbutils.file_references_for_component(avbutils.primary_track_for_composition(comp).component))
-				except StopIteration as e:
-					print("No file soruce:",comp)
+				if "descriptor" in comp.property_data and isinstance(comp.descriptor, avb.essence.MediaDescriptor) and isinstance(comp.descriptor.locator, avb.misc.MSMLocator):
+					source_drive = comp.descriptor.locator.last_known_volume
 				else:
-					if isinstance(file_source_clip.mob.descriptor.locator, avb.misc.MSMLocator):
-						source_drive = file_source_clip.mob.descriptor.locator.last_known_volume
-						print(source_drive)
+					try:
+					# TODO: Do if comp itself is file source first, otherwise...
+						file_source_clip, offset = next(avbutils.file_references_for_component(avbutils.primary_track_for_composition(comp).component))
+					except StopIteration as e:
+						#print("No file soruce:",comp)
+						pass
+					else:
+						if isinstance(file_source_clip.mob.descriptor.locator, avb.misc.MSMLocator):
+							source_drive = file_source_clip.mob.descriptor.locator.last_known_volume
+							#print(source_drive)
 				
 				# Timecode
 				# NOTE: This is all pretty sloppy here.
@@ -1069,10 +1073,11 @@ class MainApplication(QtWidgets.QApplication):
 
 
 		self._prog_loading = QtWidgets.QProgressBar()
-		self._prog_loading.setWindowModality(QtCore.Qt.WindowModality.ApplicationModal)
+		self._prog_loading.setSizePolicy(self._prog_loading.sizePolicy().horizontalPolicy(), QtWidgets.QSizePolicy.Policy.Ignored)
+		#self._prog_loading.setWindowModality(QtCore.Qt.WindowModality.ApplicationModal)
 		#self._prog_loading.setWindowFlag(QtCore.Qt.WindowType.Tool)
 		self._prog_loading.setRange(0,0)
-		self._prog_loading.setWindowTitle("Loading bin...")
+		#self._prog_loading.setWindowTitle("Loading bin...")
 
 		self._col_defs_presenter = BinViewColumDefinitionsPresenter()
 		self._prop_data_presenter = BinViewPropertyDataPresenter()
@@ -1127,6 +1132,8 @@ class MainApplication(QtWidgets.QApplication):
 		self._main_bin_contents.topSectionWidget().addWidget(PushButtonAction(action=self._act_view_list, show_text=False))
 		self._main_bin_contents.topSectionWidget().addWidget(PushButtonAction(action=self._act_view_frame, show_text=False))
 		self._main_bin_contents.topSectionWidget().addWidget(PushButtonAction(action=self._act_view_script, show_text=False))
+
+		self._main_bin_contents.bottomSectionWidget().layout().insertWidget(0, self._prog_loading)
 
 		self._txt_search = QtWidgets.QLineEdit()
 		self._txt_search.setFixedWidth(self._txt_search.fontMetrics().averageCharWidth() * 20)
@@ -1216,6 +1223,8 @@ class MainApplication(QtWidgets.QApplication):
 		dock_sift.setFont(dock_font)
 		dock_sift.setWidget(self._view_binsiftsettings)
 
+		#self._wnd_main.setDockOptions(QtWidgets.QMainWindow.DockOption.)
+
 
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_sortoptions)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_sift)
@@ -1224,6 +1233,9 @@ class MainApplication(QtWidgets.QApplication):
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_displayoptions)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_appearance)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_btn_open)
+
+		for dock_widget in (dock_sortoptions, dock_sift, dock_propdefs, dock_coldefs, dock_displayoptions, dock_appearance, dock_btn_open):
+			dock_widget.hide()
 
 		self._wnd_main.show()
 	
@@ -1354,7 +1366,7 @@ class MainApplication(QtWidgets.QApplication):
 		#self._worker.signals().sig_done_loading.connect(lambda: self._tree_bin_contents.sortByColumn(0, QtCore.Qt.SortOrder.AscendingOrder))
 		self._worker.signals().sig_done_loading.connect(lambda: self._tree_column_defs.sortByColumn(0, QtCore.Qt.SortOrder.AscendingOrder))
 		self._worker.signals().sig_done_loading.connect(lambda: self._tree_property_data.sortByColumn(0, QtCore.Qt.SortOrder.DescendingOrder))
-		self._worker.signals().sig_done_loading.connect(self._prog_loading.close)
+		self._worker.signals().sig_done_loading.connect(self._prog_loading.hide)
 		self._threadpool.start(self._worker)
 	
 	@QtCore.Slot()
