@@ -1031,8 +1031,11 @@ class MainApplication(QtWidgets.QApplication):
 
 	def __init__(self):
 
+
 		super().__init__()
 
+		HIDE_DOCK = True
+		
 		self._threadpool = QtCore.QThreadPool(self)
 
 		# Actions
@@ -1124,6 +1127,7 @@ class MainApplication(QtWidgets.QApplication):
 		self._cmb_bin_view_list = QtWidgets.QComboBox()
 		self._cmb_bin_view_list.setMinimumWidth(self._cmb_bin_view_list.fontMetrics().averageCharWidth()*20)
 		self._cmb_bin_view_list.setMaximumWidth(self._cmb_bin_view_list.fontMetrics().averageCharWidth()*32)
+		self._cmb_bin_view_list.setToolTip("Current bin view")
 		#self._cmb_bin_view_list.addItem("Current View")
 		self._main_bin_contents.topSectionWidget().addWidget(self._cmb_bin_view_list)
 
@@ -1137,8 +1141,8 @@ class MainApplication(QtWidgets.QApplication):
 
 		self._txt_search = QtWidgets.QLineEdit()
 		self._txt_search.setFixedWidth(self._txt_search.fontMetrics().averageCharWidth() * 20)
-		self._txt_search.setPlaceholderText("Find bin bin...")
-		self._txt_search.textEdited.connect(print)
+		self._txt_search.setPlaceholderText("Find in bin...")
+		self._txt_search.setToolTip("Filter all items based on this text")
 		self._txt_search.setClearButtonEnabled(True)
 
 		self._main_bin_contents.topSectionWidget().addSeparator()
@@ -1157,6 +1161,7 @@ class MainApplication(QtWidgets.QApplication):
 		self._tree_bin_contents.model().sourceModel().rowsRemoved.connect(self._main_bin_contents.updateBinStats)
 		self._tree_bin_contents.model().sourceModel().modelReset.connect(self._main_bin_contents.updateBinStats)
 
+		self._txt_search.textEdited.connect(self._tree_bin_contents.model().setSearchText)
 
 		self._view_BinDisplayItemTypes.sig_flags_changed.connect(self._tree_bin_contents.setBinDisplayItemTypes)
 		
@@ -1234,8 +1239,9 @@ class MainApplication(QtWidgets.QApplication):
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_appearance)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_btn_open)
 
-		for dock_widget in (dock_sortoptions, dock_sift, dock_propdefs, dock_coldefs, dock_displayoptions, dock_appearance, dock_btn_open):
-			dock_widget.hide()
+		if HIDE_DOCK:
+			for dock_widget in (dock_sortoptions, dock_sift, dock_propdefs, dock_coldefs, dock_displayoptions, dock_appearance, dock_btn_open):
+				dock_widget.hide()
 
 		self._wnd_main.show()
 	

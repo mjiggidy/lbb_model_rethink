@@ -17,42 +17,78 @@ class TRTSortFilterProxyModel(QtCore.QSortFilterProxyModel):
 		self._sort_collator.setNumericMode(True)
 		self._sort_collator.setCaseSensitivity(QtCore.Qt.CaseSensitivity.CaseInsensitive)
 
-		self._bin_display_items = avbutils.BinDisplayItemTypes(0)
-
-		self._search_text = ""
+		self._filter_bin_display_items = avbutils.BinDisplayItemTypes(0)
+		self._filter_search_text       = ""
 
 		self.setSortRole(QtCore.Qt.ItemDataRole.InitialSortOrderRole)
 
 	def filterAcceptsRow(self, source_row:int, source_parent:QtCore.QModelIndex) -> bool:
+		"""Filter rows based on all the applicable sift/bin display/search stuff"""
+
+		return all((
+			self.binDisplayFilter(source_row, source_parent),
+			self.searchTextFilter(source_row, source_parent),
+		))
+
 		
+		#return super().filterAcceptsRow(source_row, source_parent)
+	
+	def binDisplayFilter(self, source_row:int, source_parent:QtCore.QModelIndex) -> bool:
+		"""Filter rows based on item type (via Bin Display settings)"""
+
+		# Determine BinItemType column index from the source model (since it could be hidden)
+		# NOTE: Once this is exclusively an AVB proxy model, won't need the `try`
 		try:
 			item_type_header_index = next(c
 				for c in range(self.sourceModel().columnCount(source_parent))
 				if self.sourceModel().headerData(c, QtCore.Qt.Orientation.Horizontal, role=QtCore.Qt.ItemDataRole.UserRole+1) == 200
 			)
 		except StopIteration:
+#			print("Item types not available")
+			# TODO: Pass through exception -- in AVB the type should definitely be available
 			return super().filterAcceptsRow(source_row, source_parent)
 		
+		# Get the item type from the source moddel
 		src_index = self.sourceModel().index(source_row, item_type_header_index, source_parent)
 		item_types = src_index.data(QtCore.Qt.ItemDataRole.UserRole).raw_data()
 
-		
 		if isinstance(item_types, avbutils.BinDisplayItemTypes):
-			return bool(item_types in self._bin_display_items)
+			return bool(item_types in self._filter_bin_display_items)
+		else:
+			raise ValueError(f"Invalid data type `{type(item_types).__name__}` for filter (expected `BinDisplayItemTypes`)")
+	
+	def searchTextFilter(self, source_row:int, source_parent:QtCore.QModelIndex) -> bool:
+		"""Filter rows based on display text"""
 
+		if not self._filter_search_text:
+			return True
+
+		search_text = self._filter_search_text.casefold()
+
+		#self.mapToSource()
+		#self.columnCount()
+#
+		for source_col in range(self.sourceModel().columnCount()):
+
+			# TODO: For later: ignore hidden columns
+			if not self.filterAcceptsColumn(source_col, source_parent):
+				continue
+
+			source_text = self.sourceModel().data(self.sourceModel().index(source_row, source_col, source_parent), QtCore.Qt.ItemDataRole.DisplayRole) or ""
+			if search_text in source_text.casefold():
+				return True
 		
-		return super().filterAcceptsRow(source_row, source_parent)
-		
-		
-		
-		#print(item_types & self.binDisplayItemTypes())
-		#return bool(item_types & self.binDisplayItemTypes())
+		return False
+	
+
+
+	
 
 	@QtCore.Slot(object)
 	def setSearchText(self, search_text:str):
 		"""Set the text filter"""
 
-		self._search_text = search_text
+		self._filter_search_text = search_text
 		self.invalidateRowsFilter()
 
 	
@@ -65,12 +101,19 @@ class TRTSortFilterProxyModel(QtCore.QSortFilterProxyModel):
 	@QtCore.Slot(object)
 	def setBinDisplayItemTypes(self, types:avbutils.BinDisplayItemTypes):
 
-		self._bin_display_items = types
+		self._filter_bin_display_items = types
 		print(self.binDisplayItemTypes().__repr__())
 		self.invalidateRowsFilter()
 	
 	def binDisplayItemTypes(self) -> avbutils.BinDisplayItemTypes:
-		return self._bin_display_items
+		return self._filter_bin_display_items
+	
+	@QtCore.Slot(object)
+	def setSearchFilterText(self, search_text:str):
+		self._filter_search_text = search_text
+
+	def searchFilterText(self) -> str:
+		return self._filter_search_text
 		
 
 class TRTTimelineViewModel(QtCore.QAbstractItemModel):
