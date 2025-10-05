@@ -64,10 +64,7 @@ class TRTSortFilterProxyModel(QtCore.QSortFilterProxyModel):
 			return True
 
 		search_text = self._filter_search_text.casefold()
-
-		#self.mapToSource()
-		#self.columnCount()
-#
+		
 		for source_col in range(self.sourceModel().columnCount()):
 
 			# TODO: For later: ignore hidden columns
