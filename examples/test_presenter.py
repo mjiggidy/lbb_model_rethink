@@ -62,6 +62,7 @@ class BinContentsWidget(QtWidgets.QWidget):
 	"""Display bin contents and controls"""
 
 	sig_request_open_bin = QtCore.Signal()
+	sig_request_bin_display  = QtCore.Signal()
 	sig_request_display_mode = QtCore.Signal(object)
 
 	def __init__(self, *args, **kwargs):
@@ -139,6 +140,13 @@ class BinContentsWidget(QtWidgets.QWidget):
 		self._section_bottom.layout().addStretch()
 		self._lbl_bin_item_count = QtWidgets.QLabel()
 		self._section_bottom.layout().addWidget(self._lbl_bin_item_count)
+
+		self._btn_show_bin_display = QtWidgets.QPushButton()
+		self._btn_show_bin_display.setCheckable(True)
+		self._btn_show_bin_display.toggled.connect(self.sig_request_bin_display)
+		self._btn_show_bin_display.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.GoNext))
+
+		self._section_bottom.layout().addWidget(self._btn_show_bin_display)
 
 
 	def treeView(self) -> "BinTreeView":
@@ -1151,6 +1159,7 @@ class MainApplication(QtWidgets.QApplication):
 
 		self._main_bin_contents.sig_request_open_bin.connect(self.browseForBin)
 		
+		
 		self._tree_bin_contents = self._main_bin_contents.treeView()
 		self._tree_bin_contents.model().setSourceModel(self._contents_presenter.viewModel())
 
@@ -1195,13 +1204,15 @@ class MainApplication(QtWidgets.QApplication):
 		dock_font = QtWidgets.QDockWidget().font()
 		dock_font.setPointSizeF(dock_font.pointSizeF() * 0.8)
 
-		dock_displayoptions = QtWidgets.QDockWidget("Bin Display Settings")
-		dock_displayoptions.setFont(dock_font)
-		dock_displayoptions.setWidget(QtWidgets.QScrollArea())
-		dock_displayoptions.widget().setWidgetResizable(True)
-		dock_displayoptions.widget().setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
-		dock_displayoptions.widget().setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-		dock_displayoptions.widget().setWidget(self._view_BinDisplayItemTypes)
+		self.dock_displayoptions = QtWidgets.QDockWidget("Bin Display Settings")
+		self.dock_displayoptions.setFont(dock_font)
+		self.dock_displayoptions.setWidget(QtWidgets.QScrollArea())
+		self.dock_displayoptions.widget().setWidgetResizable(True)
+		self.dock_displayoptions.widget().setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+		self.dock_displayoptions.widget().setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+		self.dock_displayoptions.widget().setWidget(self._view_BinDisplayItemTypes)
+
+		self._main_bin_contents.sig_request_bin_display.connect(self.dock_displayoptions.show)
 
 		dock_appearance = QtWidgets.QDockWidget("Bin Appearance Settings")
 		dock_appearance.setFont(dock_font)
@@ -1235,12 +1246,12 @@ class MainApplication(QtWidgets.QApplication):
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_sift)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_propdefs)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_coldefs)
-		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_displayoptions)
+		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, self.dock_displayoptions)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_appearance)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_btn_open)
 
 		if HIDE_DOCK:
-			for dock_widget in (dock_sortoptions, dock_sift, dock_propdefs, dock_coldefs, dock_displayoptions, dock_appearance, dock_btn_open):
+			for dock_widget in (dock_sortoptions, dock_sift, dock_propdefs, dock_coldefs, self.dock_displayoptions, dock_appearance, dock_btn_open):
 				dock_widget.hide()
 
 		self._wnd_main.show()
@@ -1351,6 +1362,7 @@ class MainApplication(QtWidgets.QApplication):
 		self._worker.signals().sig_got_view_settings.connect(self._prop_data_presenter.setBinView)
 		self._worker.signals().sig_got_view_settings.connect(self._contents_presenter.setBinView)
 		self._worker.signals().sig_got_view_settings.connect(lambda view: self._cmb_bin_view_list.insertItem(0,view.name))
+		self._worker.signals().sig_got_view_settings.connect(lambda view: self._cmb_bin_view_list.setCurrentIndex(0))
 #		self._worker.signals().sig_got_view_settings.connect(self._main_bin_contents.setBinView)
 
 		self._worker.signals().sig_got_sift_settings.connect(self._sift_presenter.setSiftSettings)
