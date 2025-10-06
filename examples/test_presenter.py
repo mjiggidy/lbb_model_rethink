@@ -1082,6 +1082,14 @@ class MainApplication(QtWidgets.QApplication):
 		self._actgrp_view_mode.addAction(self._act_view_frame)
 		self._actgrp_view_mode.addAction(self._act_view_script)
 
+		self._act_toggle_bindisplay_options  = QtGui.QAction("Show Bin Display Options", checkable=True)
+		self._act_toggle_bindisplay_options.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.DocumentPageSetup))
+
+		self._act_toggle_bindview_options    = QtGui.QAction("Show Bin View Options", checkable=True)
+		self._act_toggle_bindview_options.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.ViewRestore))
+		
+		self._act_toggle_fontscolors_options = QtGui.QAction("Show Appearance Options", checkable=True)
+		self._act_toggle_fontscolors_options.setIcon(QtGui.QIcon.fromTheme(QtGui.QIcon.ThemeIcon.ToolsCheckSpelling))
 
 		self._prog_loading = QtWidgets.QProgressBar()
 		self._prog_loading.setSizePolicy(self._prog_loading.sizePolicy().horizontalPolicy(), QtWidgets.QSizePolicy.Policy.Ignored)
@@ -1145,6 +1153,10 @@ class MainApplication(QtWidgets.QApplication):
 		self._main_bin_contents.topSectionWidget().addWidget(PushButtonAction(action=self._act_view_frame, show_text=False))
 		self._main_bin_contents.topSectionWidget().addWidget(PushButtonAction(action=self._act_view_script, show_text=False))
 
+		self._main_bin_contents.bottomSectionWidget().layout().insertWidget(0,PushButtonAction(action=self._act_toggle_fontscolors_options, show_text=False))
+		self._main_bin_contents.bottomSectionWidget().layout().insertWidget(0,PushButtonAction(action=self._act_toggle_bindview_options, show_text=False))
+		self._main_bin_contents.bottomSectionWidget().layout().insertWidget(0,PushButtonAction(action=self._act_toggle_bindisplay_options, show_text=False))
+
 		self._main_bin_contents.bottomSectionWidget().layout().insertWidget(0, self._prog_loading)
 
 		self._txt_search = QtWidgets.QLineEdit()
@@ -1195,6 +1207,11 @@ class MainApplication(QtWidgets.QApplication):
 		self._mnu_view.addAction(self._act_view_list)
 		self._mnu_view.addAction(self._act_view_frame)
 		self._mnu_view.addAction(self._act_view_script)
+		self._mnu_view.addSeparator()
+		self._mnu_view.addAction(self._act_toggle_bindview_options)
+		self._mnu_view.addAction(self._act_toggle_bindisplay_options)
+		self._mnu_view.addAction(self._act_toggle_fontscolors_options)
+		self._mnu_view.addSeparator()
 
 		self._wnd_main.menuBar().addMenu(self._mnu_file)
 		self._wnd_main.menuBar().addMenu(self._mnu_view)
@@ -1204,27 +1221,25 @@ class MainApplication(QtWidgets.QApplication):
 		dock_font = QtWidgets.QDockWidget().font()
 		dock_font.setPointSizeF(dock_font.pointSizeF() * 0.8)
 
-		self.dock_displayoptions = QtWidgets.QDockWidget("Bin Display Settings")
-		self.dock_displayoptions.setFont(dock_font)
-		self.dock_displayoptions.setWidget(QtWidgets.QScrollArea())
-		self.dock_displayoptions.widget().setWidgetResizable(True)
-		self.dock_displayoptions.widget().setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
-		self.dock_displayoptions.widget().setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-		self.dock_displayoptions.widget().setWidget(self._view_BinDisplayItemTypes)
+		self._dock_bindisplayoptions = QtWidgets.QDockWidget("Bin Display Settings")
+		self._dock_bindisplayoptions.setFont(dock_font)
+		self._dock_bindisplayoptions.setWidget(QtWidgets.QScrollArea())
+		self._dock_bindisplayoptions.widget().setWidgetResizable(True)
+		self._dock_bindisplayoptions.widget().setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+		self._dock_bindisplayoptions.widget().setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+		self._dock_bindisplayoptions.widget().setWidget(self._view_BinDisplayItemTypes)
 
-		self._main_bin_contents.sig_request_bin_display.connect(self.dock_displayoptions.show)
-
-		dock_appearance = QtWidgets.QDockWidget("Bin Appearance Settings")
-		dock_appearance.setFont(dock_font)
-		dock_appearance.setWidget(self._view_BinAppearanceSettings)
+		self._dock_appearance = QtWidgets.QDockWidget("Bin Appearance Settings")
+		self._dock_appearance.setFont(dock_font)
+		self._dock_appearance.setWidget(self._view_BinAppearanceSettings)
 
 		dock_propdefs = QtWidgets.QDockWidget("Property Data")
 		dock_propdefs.setFont(dock_font)
 		dock_propdefs.setWidget(self._tree_property_data)
 
-		dock_coldefs = QtWidgets.QDockWidget("Column Definitions")
-		dock_coldefs.setFont(dock_font)
-		dock_coldefs.setWidget(self._tree_column_defs)
+		self._dock_binview_options = QtWidgets.QDockWidget("Column Definitions")
+		self._dock_binview_options.setFont(dock_font)
+		self._dock_binview_options.setWidget(self._tree_column_defs)
 
 
 		dock_btn_open = QtWidgets.QDockWidget("Options")
@@ -1245,13 +1260,17 @@ class MainApplication(QtWidgets.QApplication):
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_sortoptions)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_sift)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_propdefs)
-		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_coldefs)
-		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, self.dock_displayoptions)
-		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_appearance)
+		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, self._dock_binview_options)
+		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, self._dock_bindisplayoptions)
+		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, self._dock_appearance)
 		self._wnd_main.addDockWidget(QtCore.Qt.DockWidgetArea.RightDockWidgetArea, dock_btn_open)
 
+		self._act_toggle_bindisplay_options.triggered.connect(lambda: self._dock_bindisplayoptions.show() if self._dock_bindisplayoptions.isHidden() else self._dock_bindisplayoptions.hide())
+		self._act_toggle_bindview_options.triggered.connect(lambda: self._dock_binview_options.show() if self._dock_binview_options.isHidden() else self._dock_binview_options.hide())
+		self._act_toggle_fontscolors_options.triggered.connect(lambda: self._dock_appearance.show() if self._dock_appearance.isHidden() else self._dock_appearance.hide())
+
 		if HIDE_DOCK:
-			for dock_widget in (dock_sortoptions, dock_sift, dock_propdefs, dock_coldefs, self.dock_displayoptions, dock_appearance, dock_btn_open):
+			for dock_widget in (dock_sortoptions, dock_sift, dock_propdefs, self._dock_binview_options, self._dock_bindisplayoptions, self._dock_appearance, dock_btn_open):
 				dock_widget.hide()
 
 		self._wnd_main.show()
